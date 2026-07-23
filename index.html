@@ -1,0 +1,450 @@
+<style>
+  :root{
+    --bg:#F7F8FC; --panel:#FFFFFF; --panel-2:#F1F2F8;
+    --text:#181A24; --muted:#585C6E; --faint:#8A8FA3;
+    --brd:#E6E8F1; --brd-2:#D6D9E6;
+    --accent:#5B57E8; --accent-ink:#4642CE; --accent-soft:#EEEDFD;
+    --good:#0E9A8C; --good-soft:#E2F5F2;
+    --warn:#946110; --warn-soft:#FBF1DD;
+    --grad:linear-gradient(100deg,#5B57E8 0%,#4E7BEF 28%,#14B8A6 50%,#4E7BEF 72%,#5B57E8 100%);
+    --glow:#6E5AF0; --glow-2:#2FB6D6;
+    --shadow:0 1px 2px rgba(24,26,40,.04), 0 10px 26px -16px rgba(24,26,40,.22);
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --maxw:1080px;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0A0B11; --panel:rgba(255,255,255,.05); --panel-2:rgba(255,255,255,.08);
+    --text:#ECEEF7; --muted:#A2A6BC; --faint:#6C7189;
+    --brd:rgba(255,255,255,.09); --brd-2:rgba(255,255,255,.17);
+    --accent:#8A86FF; --accent-ink:#A9A5FF; --accent-soft:rgba(124,116,240,.15);
+    --good:#2DD4BF; --good-soft:rgba(45,212,191,.14);
+    --warn:#E0A64B; --warn-soft:rgba(224,166,75,.14);
+    --grad:linear-gradient(100deg,#8A86FF 0%,#6AA6FF 28%,#2FD4C0 50%,#6AA6FF 72%,#8A86FF 100%);
+    --glow:#7C74F0; --glow-2:#3AC7E0;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 30px -18px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+  a{color:var(--accent-ink)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  @keyframes shimmer{to{background-position:200% center}}
+  .grad-text{background:var(--grad);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 7s linear infinite}
+
+  header.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--brd)}
+  .top .wrap{display:flex;align-items:center;height:58px;gap:10px}
+  .brand{font-weight:800;font-size:20px;letter-spacing:-.03em}
+  .top .sp{flex:1}
+  .top .tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border:1px solid var(--brd-2);border-radius:999px;padding:4px 11px}
+  .iconbtn{font:inherit;font-size:13px;font-weight:600;line-height:1;color:var(--muted);background:var(--panel);border:1px solid var(--brd-2);border-radius:9px;padding:6px 10px;cursor:pointer}
+  .iconbtn:hover{color:var(--text)}
+
+  .hero{position:relative;overflow:hidden;text-align:center;padding:56px 20px 34px}
+  .glow{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;opacity:var(--o);animation:breathe 8s ease-in-out infinite alternate;will-change:transform,opacity}
+  .glow.a{width:460px;height:460px;background:var(--glow);--o:.28;top:-170px;left:calc(50% - 340px);animation-duration:8s}
+  .glow.b{width:420px;height:420px;background:var(--glow-2);--o:.2;top:-120px;left:calc(50% + 20px);animation-duration:6.5s;animation-delay:-2.5s}
+  :root[data-theme="dark"] .glow.a{--o:.5}
+  :root[data-theme="dark"] .glow.b{--o:.34}
+  @keyframes breathe{0%{transform:scale(1);opacity:var(--o)}100%{transform:scale(1.15);opacity:calc(var(--o) + .08)}}
+  .hero-inner{position:relative;z-index:1}
+
+  .kicker{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;letter-spacing:.03em;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--brd);border-radius:999px;padding:6px 14px;margin-bottom:18px}
+  h1{font-size:clamp(31px,5.4vw,55px);font-weight:800;letter-spacing:-.035em;line-height:1.03;margin:0 auto;max-width:16ch;text-wrap:balance}
+  .hero p{color:var(--muted);margin:16px auto 0;max-width:54ch;font-size:16.5px}
+
+  .searchbox{max-width:660px;margin:28px auto 0;display:flex;gap:9px;background:var(--panel);border:1.5px solid var(--brd-2);border-radius:16px;padding:8px 8px 8px 18px;box-shadow:0 10px 40px -18px color-mix(in srgb,var(--accent) 55%,transparent)}
+  .searchbox:focus-within{border-color:var(--accent)}
+  .searchbox input{flex:1;border:0;background:none;color:var(--text);font:inherit;font-size:16px;padding:13px 0}
+  .searchbox input::placeholder{color:var(--faint)}
+  .searchbox input:focus{outline:none}
+  .btn{font:inherit;font-weight:700;cursor:pointer;border-radius:12px;border:1px solid transparent;padding:13px 22px;white-space:nowrap}
+  .btn.primary{color:#fff;background:var(--grad);background-size:200% auto;animation:shimmer 8s linear infinite;box-shadow:0 8px 24px -10px color-mix(in srgb,var(--accent) 70%,transparent)}
+  .btn.primary:hover{filter:brightness(1.06)}
+
+  .chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px auto 0}
+  .chip{font:inherit;font-size:13px;cursor:pointer;background:var(--panel);color:var(--muted);border:1px solid var(--brd);border-radius:999px;padding:7px 14px}
+  .chip:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .samplenote{font-size:12.5px;color:var(--faint);margin:20px auto 0}
+
+  .cols{display:grid;grid-template-columns:236px 1fr;gap:22px;padding:8px 0 96px;align-items:start}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}}
+  .filters{position:sticky;top:74px;background:var(--panel);border:1px solid var(--brd);border-radius:16px;padding:4px 16px 14px;box-shadow:var(--shadow)}
+  @media (max-width:760px){.filters{position:static}}
+  .fgroup{padding:14px 0;border-bottom:1px solid var(--brd)}
+  .fgroup:last-child{border-bottom:0}
+  .fgroup h4{margin:0 0 9px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  select{width:100%;font:inherit;font-size:14px;color:var(--text);background:var(--panel-2);border:1px solid var(--brd-2);border-radius:10px;padding:9px 30px 9px 11px;cursor:pointer;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='%238A8FA3' stroke-width='1.5'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
+  select:hover{border-color:var(--accent)}
+  option{background:var(--panel);color:var(--text)}
+  .toggle{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;user-select:none;color:var(--text)}
+  .toggle input{position:absolute;opacity:0;width:0;height:0}
+  .track{width:36px;height:21px;border-radius:999px;background:var(--brd-2);position:relative;transition:background .16s;flex:none}
+  .track::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.35);transition:transform .16s}
+  .toggle input:checked + .track{background:var(--accent)}
+  .toggle input:checked + .track::after{transform:translateX(15px)}
+  .reset{margin-top:12px;font:inherit;font-size:13px;color:var(--accent-ink);background:none;border:0;cursor:pointer;padding:0}
+  .reset:hover{text-decoration:underline}
+
+  .results{min-width:0}
+  .rbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .rbar .count{font-size:14px;color:var(--muted)}
+  .rbar .count b{color:var(--text)}
+  .rbar .sortwrap{display:flex;align-items:center;gap:8px}
+  .rbar label{font-size:12.5px;color:var(--faint);white-space:nowrap}
+  .rbar select{width:auto}
+
+  .list{display:flex;flex-direction:column;gap:13px}
+  .card{background:var(--panel);border:1px solid var(--brd);border-radius:15px;padding:16px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;transition:border-color .18s, transform .18s, box-shadow .18s}
+  .card:hover{border-color:var(--brd-2);transform:translateY(-2px);box-shadow:0 1px 2px rgba(24,26,40,.05), 0 16px 34px -18px color-mix(in srgb,var(--accent) 40%,transparent)}
+  .card .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .card h3{margin:0;font-size:17.5px;font-weight:700;line-height:1.25;letter-spacing:-.015em}
+  .card .uni{font-size:13.5px;color:var(--muted);margin-top:3px}
+  .lvl{font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--brd);border-radius:7px;padding:3px 9px;white-space:nowrap;flex:none}
+  .why{font-size:13.5px;line-height:1.45;color:var(--text);background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);border-radius:12px;padding:10px 13px}
+  .why b{background:var(--grad);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700;animation:shimmer 7s linear infinite}
+  .facts{display:flex;flex-wrap:wrap;gap:9px 22px;align-items:flex-end}
+  .fact{display:flex;flex-direction:column;gap:1px}
+  .fact .k{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .fact .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px}
+  .fact .v.big{font-size:17px;font-weight:600}
+  .fact .v.free{color:var(--good)}
+  .fact .v.soon{color:var(--warn)}
+  .fact .note{font-size:11px;color:var(--faint);margin-top:1px}
+  .card .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--brd);padding-top:11px}
+  .src{font-size:11.5px;color:var(--faint)}
+  .lnk{font-size:13.5px;font-weight:600;color:var(--accent-ink);text-decoration:none}
+  .lnk:hover{text-decoration:underline}
+
+  .empty{background:var(--panel);border:1px solid var(--brd);border-radius:15px;padding:44px 24px;text-align:center;color:var(--muted);box-shadow:var(--shadow)}
+  .empty b{display:block;color:var(--text);font-size:16px;margin-bottom:5px}
+
+  footer.foot{border-top:1px solid var(--brd);padding:24px 0;color:var(--faint);font-size:12.5px;text-align:center}
+
+  .card.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease, transform .55s cubic-bezier(.2,.7,.2,1)}
+  .card.reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){
+    .grad-text,.btn.primary,.why b,.glow{animation:none}
+    .card,.card.reveal{transition:none;transform:none;opacity:1}
+  }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">Koun<span class="grad-text">sly</span></div>
+    <div class="sp"></div>
+    <span class="tag">Prototype</span>
+    <button class="iconbtn" id="langbtn">EN</button>
+    <button class="iconbtn" id="themebtn" aria-label="Theme">☾</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="hero-inner">
+    <div class="kicker" data-i18n="kicker"></div>
+    <h1><span data-i18n="h1a"></span> <span class="grad-text" data-i18n="h1b"></span></h1>
+    <p data-i18n="lede"></p>
+    <div class="searchbox">
+      <input id="q" type="text" autocomplete="off" aria-label="query" data-i18n-ph="ph">
+      <button class="btn primary" id="go" data-i18n="search"></button>
+    </div>
+    <div class="chips">
+      <button class="chip" data-qi="1"></button>
+      <button class="chip" data-qi="2"></button>
+      <button class="chip" data-qi="3"></button>
+    </div>
+    <div class="samplenote" data-i18n="samplenote"></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="cols">
+    <aside class="filters">
+      <div class="fgroup"><h4 data-i18n="f_region"></h4><select id="f-region"></select></div>
+      <div class="fgroup"><h4 data-i18n="f_country"></h4><select id="f-country"></select></div>
+      <div class="fgroup"><h4 data-i18n="f_field"></h4><select id="f-field"></select></div>
+      <div class="fgroup"><h4 data-i18n="f_level"></h4><select id="f-level"></select></div>
+      <div class="fgroup"><h4 data-i18n="f_budget"></h4><select id="f-budget"></select></div>
+      <div class="fgroup">
+        <label class="toggle"><input type="checkbox" id="f-free"><span class="track"></span><span data-i18n="freeonly"></span></label>
+        <button class="reset" id="reset" data-i18n="reset"></button>
+      </div>
+    </aside>
+
+    <section class="results">
+      <div class="rbar">
+        <div class="count" id="count"></div>
+        <div class="sortwrap"><label for="f-sort" data-i18n="sortlabel"></label><select id="f-sort"></select></div>
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+  </div>
+</div>
+
+<footer class="foot"><div class="wrap" data-i18n="footer"></div></footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches;
+  var lang="uk";
+
+  var STR={
+    en:{kicker:"✦ unbiased matches, worldwide",h1a:"Find your degree abroad.",h1b:"Just ask.",
+      lede:"Describe what you want in plain English. Kounsly finds English-taught programs anywhere in the world — with real tuition, deadlines and requirements. No agent, no commission.",
+      ph:"affordable data science master taught in English, with a scholarship",search:"Search",
+      chip1:"Fully funded master's",q1:"Fully funded master's with scholarship and stipend",
+      chip2:"Cheap CS bachelor",q2:"Cheap computer science bachelor in English",
+      chip3:"Study for free",q3:"Where can I study for free abroad in English",
+      samplenote:"Sample data for the prototype — figures are illustrative, not verified.",
+      f_region:"Region",f_country:"Country",f_field:"Field",f_level:"Level",f_budget:"Max tuition / year",
+      opt_anywhere:"Anywhere",opt_allc:"All countries",opt_anyfield:"Any field",opt_anylevel:"Any level",opt_nolimit:"No limit",opt_free:"Free (≤ €500)",
+      freeonly:"Free / low-cost only",reset:"Reset filters",sortlabel:"Sort",
+      sort_match:"Best match",sort_tuition:"Lowest tuition",sort_deadline:"Deadline soonest",sort_ielts:"Lowest IELTS",
+      prog_one:"program",prog_many:"programs",matched:" matched",
+      fact_tuition:"Tuition / year",fact_deadline:"Deadline",fact_ielts:"IELTS",fact_lang:"Language",lang_english:"English ",
+      closing:"closing soon",source:"Source:",checked:"· checked (demo)",official:"Official page ↗",whylabel:"Why it fits — ",
+      why_en:"taught 100% in English",why_funding:"funding covers most/all cost",why_free:"€0 tuition (fee only)",
+      empty_title:"No programs match that yet.",empty_body:"The prototype has 28 sample programs across Europe, Asia, the Middle East, the Americas, Oceania & Africa. Loosen a filter or broaden your search.",
+      footer:"Kounsly — prototype · a plain-English matcher for English-taught degrees worldwide, honest on cost.",langbtn:"EN"},
+    uk:{kicker:"✦ неупереджений підбір, по всьому світу",h1a:"Знайди навчання за кордоном.",h1b:"Просто запитай.",
+      lede:"Опиши звичайною мовою, чого хочеш. Kounsly знайде англомовні програми будь-де у світі — з реальною вартістю, дедлайнами та вимогами. Без агента й комісій.",
+      ph:"дешевий магістр з data science англійською, зі стипендією",search:"Пошук",
+      chip1:"Магістр з фінансуванням",q1:"магістр зі стипендією та фінансуванням",
+      chip2:"Дешевий бакалавр CS",q2:"дешевий бакалавр computer science англійською",
+      chip3:"Навчатись безкоштовно",q3:"де можна навчатись безкоштовно за кордоном англійською",
+      samplenote:"Демо-дані прототипу — цифри ілюстративні, не звірені.",
+      f_region:"Регіон",f_country:"Країна",f_field:"Напрям",f_level:"Рівень",f_budget:"Макс. плата / рік",
+      opt_anywhere:"Будь-де",opt_allc:"Усі країни",opt_anyfield:"Будь-який напрям",opt_anylevel:"Будь-який рівень",opt_nolimit:"Без обмежень",opt_free:"Безкоштовно (≤ €500)",
+      freeonly:"Лише безкоштовні / дешеві",reset:"Скинути фільтри",sortlabel:"Сортування",
+      sort_match:"За релевантністю",sort_tuition:"Найдешевші",sort_deadline:"Дедлайн найближче",sort_ielts:"Найнижчий IELTS",
+      prog_one:"програма",prog_few:"програми",prog_many:"програм",
+      fact_tuition:"Плата / рік",fact_deadline:"Дедлайн",fact_ielts:"IELTS",fact_lang:"Мова",lang_english:"Англійська ",
+      closing:"скоро дедлайн",source:"Джерело:",checked:"· звірено (демо)",official:"Сторінка вишу ↗",whylabel:"Чому підходить — ",
+      why_en:"викладання 100% англійською",why_funding:"фінансування покриває більшу частину / всю вартість",why_free:"€0 за навчання (лише збір)",
+      empty_title:"Поки нічого не підходить.",empty_body:"У прототипі 28 демо-програм по Європі, Азії, Близькому Сході, Америках, Океанії та Африці. Послабте фільтр або розширте запит.",
+      footer:"Kounsly — прототип · підбір англомовних програм по світу звичайною мовою, чесно про вартість.",langbtn:"UA"}
+  };
+  function T(k){return STR[lang][k];}
+
+  var COUNTRY_UK={Germany:"Німеччина",Netherlands:"Нідерланди",Ireland:"Ірландія",Finland:"Фінляндія",Iceland:"Ісландія",China:"Китай",Taiwan:"Тайвань","South Korea":"Південна Корея",Japan:"Японія",Singapore:"Сінгапур","Saudi Arabia":"Саудівська Аравія",UAE:"ОАЕ",Qatar:"Катар",Canada:"Канада",Mexico:"Мексика",Brazil:"Бразилія",Australia:"Австралія","New Zealand":"Нова Зеландія","South Africa":"ПАР"};
+  var REGION_UK={Europe:"Європа",Asia:"Азія","Middle East":"Близький Схід","North America":"Пн. Америка","Latin America":"Лат. Америка",Oceania:"Океанія",Africa:"Африка"};
+  var FIELD_UK={"data science":"Data Science","computer science":"Computer Science","artificial intelligence":"Штучний інтелект","business":"Бізнес","design / hci":"Дизайн / HCI","public health":"Громадське здоровʼя","engineering":"Інженерія","environment":"Довкілля","liberal arts":"Вільні мистецтва"};
+  var LEVEL_UK={MSc:"магістр",BSc:"бакалавр"};
+
+  var DATA=[
+    {id:"tum-ds",program:"MSc Data Engineering & Analytics",uni:"Technical University of Munich",city:"Munich",country:"Germany",flag:"🇩🇪",level:"MSc",field:"data science",eng:100,tuition:0,tnote:"+ ~€150 semester fee",deadline:"May 31",dsort:5,urgent:false,ielts:6.5,src:"tum.de"},
+    {id:"rwth-cs",program:"MSc Computer Science",uni:"RWTH Aachen University",city:"Aachen",country:"Germany",flag:"🇩🇪",level:"MSc",field:"computer science",eng:100,tuition:0,tnote:"+ ~€300 semester fee",deadline:"Mar 1",dsort:3,urgent:false,ielts:6.0,src:"rwth-aachen.de"},
+    {id:"fub-ib",program:"MSc International Business",uni:"Free University of Berlin",city:"Berlin",country:"Germany",flag:"🇩🇪",level:"MSc",field:"business",eng:100,tuition:0,tnote:"+ ~€315 semester fee",deadline:"Feb 28",dsort:2,urgent:false,ielts:6.5,src:"fu-berlin.de"},
+    {id:"stgt-rob",program:"MSc Robotics & Autonomous Systems",uni:"University of Stuttgart",city:"Stuttgart",country:"Germany",flag:"🇩🇪",level:"MSc",field:"engineering",eng:100,tuition:3000,tnote:"non-EU fee (Baden-Württemberg)",deadline:"Jul 15",dsort:7,urgent:false,ielts:6.5,src:"uni-stuttgart.de"},
+    {id:"uva-ai",program:"MSc Artificial Intelligence",uni:"University of Amsterdam",city:"Amsterdam",country:"Netherlands",flag:"🇳🇱",level:"MSc",field:"artificial intelligence",eng:100,tuition:16500,tnote:"non-EU rate",deadline:"Apr 1",dsort:4,urgent:false,ielts:6.5,src:"uva.nl"},
+    {id:"delft-cse",program:"BSc Computer Science & Engineering",uni:"TU Delft",city:"Delft",country:"Netherlands",flag:"🇳🇱",level:"BSc",field:"computer science",eng:100,tuition:15000,tnote:"non-EU rate",deadline:"Jan 15",dsort:1,urgent:true,ielts:6.5,src:"tudelft.nl"},
+    {id:"jads-ds",program:"MSc Data Science & Entrepreneurship",uni:"JADS (Tilburg · TU/e)",city:"'s-Hertogenbosch",country:"Netherlands",flag:"🇳🇱",level:"MSc",field:"data science",eng:100,tuition:14000,tnote:"non-EU rate",deadline:"May 1",dsort:5,urgent:false,ielts:6.5,src:"jads.nl"},
+    {id:"ucm-las",program:"BA Liberal Arts & Sciences",uni:"University College Maastricht",city:"Maastricht",country:"Netherlands",flag:"🇳🇱",level:"BSc",field:"liberal arts",eng:100,tuition:16000,tnote:"non-EU · honours college",deadline:"Feb 1",dsort:2,urgent:false,ielts:6.5,src:"maastrichtuniversity.nl"},
+    {id:"tcd-cs",program:"MSc Computer Science — Intelligent Systems",uni:"Trinity College Dublin",city:"Dublin",country:"Ireland",flag:"🇮🇪",level:"MSc",field:"computer science",eng:100,tuition:25000,tnote:"non-EU rate",deadline:"Jun 30",dsort:6,urgent:false,ielts:6.5,src:"tcd.ie"},
+    {id:"ucd-ba",program:"MSc Business Analytics",uni:"University College Dublin",city:"Dublin",country:"Ireland",flag:"🇮🇪",level:"MSc",field:"business",eng:100,tuition:22000,tnote:"non-EU rate",deadline:"Jul 31",dsort:7,urgent:false,ielts:6.5,src:"ucd.ie"},
+    {id:"hel-ds",program:"MSc Data Science",uni:"University of Helsinki",city:"Helsinki",country:"Finland",flag:"🇫🇮",level:"MSc",field:"data science",eng:100,tuition:13000,tnote:"scholarships up to 100%",deadline:"Jan 10",dsort:1,urgent:true,ielts:6.5,src:"helsinki.fi"},
+    {id:"aalto-hci",program:"MSc Human-Computer Interaction & Design",uni:"Aalto University",city:"Espoo",country:"Finland",flag:"🇫🇮",level:"MSc",field:"design / hci",eng:100,tuition:15000,tnote:"50–100% scholarships",deadline:"Dec 1",dsort:0,urgent:true,ielts:6.5,src:"aalto.fi"},
+    {id:"hi-env",program:"MSc Environment & Natural Resources",uni:"University of Iceland",city:"Reykjavík",country:"Iceland",flag:"🇮🇸",level:"MSc",field:"environment",eng:100,tuition:0,tnote:"+ ~€500 registration fee",deadline:"Feb 1",dsort:2,urgent:false,ielts:6.5,src:"hi.is"},
+    {id:"heid-ph",program:"MSc International Health",uni:"Heidelberg University",city:"Heidelberg",country:"Germany",flag:"🇩🇪",level:"MSc",field:"public health",eng:100,tuition:3000,tnote:"non-EU fee (Baden-Württemberg)",deadline:"Mar 15",dsort:3,urgent:false,ielts:6.5,src:"uni-heidelberg.de"},
+    {id:"tsinghua-ds",program:"MSc Data Science & Information Technology",uni:"Tsinghua University",city:"Beijing",country:"China",flag:"🇨🇳",level:"MSc",field:"data science",eng:100,tuition:5000,tnote:"CSC scholarship can cover 100% + stipend",deadline:"Mar 31",dsort:3,urgent:false,ielts:6.5,src:"tsinghua.edu.cn"},
+    {id:"ntu-tw-cs",program:"MSc Computer Science & Info Engineering",uni:"National Taiwan University",city:"Taipei",country:"Taiwan",flag:"🇹🇼",level:"MSc",field:"computer science",eng:100,tuition:3000,tnote:"MOE Taiwan scholarships available",deadline:"Mar 15",dsort:3,urgent:false,ielts:6.0,src:"ntu.edu.tw"},
+    {id:"kaist-ai",program:"MSc Artificial Intelligence",uni:"KAIST",city:"Daejeon",country:"South Korea",flag:"🇰🇷",level:"MSc",field:"artificial intelligence",eng:100,tuition:0,tnote:"full scholarship + stipend for most",deadline:"Apr 30",dsort:4,urgent:false,ielts:6.5,src:"kaist.ac.kr"},
+    {id:"utokyo-eng",program:"MSc Engineering (English track)",uni:"University of Tokyo",city:"Tokyo",country:"Japan",flag:"🇯🇵",level:"MSc",field:"engineering",eng:100,tuition:0,tnote:"MEXT scholarship: free + monthly stipend",deadline:"Jan 31",dsort:1,urgent:true,ielts:7.0,src:"u-tokyo.ac.jp"},
+    {id:"nus-ba",program:"MSc Business Analytics",uni:"National University of Singapore",city:"Singapore",country:"Singapore",flag:"🇸🇬",level:"MSc",field:"business",eng:100,tuition:28000,tnote:"some scholarships",deadline:"Mar 15",dsort:3,urgent:false,ielts:6.5,src:"nus.edu.sg"},
+    {id:"kaust-cs",program:"MSc Computer Science",uni:"KAUST",city:"Thuwal",country:"Saudi Arabia",flag:"🇸🇦",level:"MSc",field:"computer science",eng:100,tuition:0,tnote:"full fellowship: free + stipend + housing",deadline:"Jan 1",dsort:1,urgent:true,ielts:6.5,src:"kaust.edu.sa"},
+    {id:"khalifa-ai",program:"MSc Artificial Intelligence",uni:"Khalifa University",city:"Abu Dhabi",country:"UAE",flag:"🇦🇪",level:"MSc",field:"artificial intelligence",eng:100,tuition:0,tnote:"full scholarship + monthly stipend common",deadline:"Jun 1",dsort:6,urgent:false,ielts:6.5,src:"ku.ac.ae"},
+    {id:"hbku-ds",program:"MSc Data Science & Engineering",uni:"Hamad Bin Khalifa University",city:"Doha",country:"Qatar",flag:"🇶🇦",level:"MSc",field:"data science",eng:100,tuition:0,tnote:"generous funding + stipend",deadline:"Feb 15",dsort:2,urgent:false,ielts:6.5,src:"hbku.edu.qa"},
+    {id:"utoronto-cs",program:"MSc Applied Computing",uni:"University of Toronto",city:"Toronto",country:"Canada",flag:"🇨🇦",level:"MSc",field:"computer science",eng:100,tuition:40000,tnote:"TA/RA funding in research streams",deadline:"Dec 15",dsort:0,urgent:true,ielts:7.0,src:"utoronto.ca"},
+    {id:"tec-ba",program:"MSc Business Analytics",uni:"Tecnológico de Monterrey",city:"Monterrey",country:"Mexico",flag:"🇲🇽",level:"MSc",field:"business",eng:100,tuition:14000,tnote:"merit scholarships up to 50%",deadline:"Apr 15",dsort:4,urgent:false,ielts:6.5,src:"tec.mx"},
+    {id:"usp-env",program:"MSc Environmental Science",uni:"University of São Paulo",city:"São Paulo",country:"Brazil",flag:"🇧🇷",level:"MSc",field:"environment",eng:60,tuition:0,tnote:"public — free; living costs only",deadline:"Apr 1",dsort:4,urgent:false,ielts:6.0,src:"usp.br"},
+    {id:"melb-ds",program:"MSc Data Science",uni:"University of Melbourne",city:"Melbourne",country:"Australia",flag:"🇦🇺",level:"MSc",field:"data science",eng:100,tuition:30000,tnote:"graduate scholarships available",deadline:"Oct 31",dsort:8,urgent:false,ielts:6.5,src:"unimelb.edu.au"},
+    {id:"auck-cs",program:"MSc Computer Science",uni:"University of Auckland",city:"Auckland",country:"New Zealand",flag:"🇳🇿",level:"MSc",field:"computer science",eng:100,tuition:25000,tnote:"non-resident rate",deadline:"Dec 1",dsort:0,urgent:true,ielts:6.5,src:"auckland.ac.nz"},
+    {id:"uct-ph",program:"MSc Public Health",uni:"University of Cape Town",city:"Cape Town",country:"South Africa",flag:"🇿🇦",level:"MSc",field:"public health",eng:100,tuition:6000,tnote:"African & merit scholarships",deadline:"Sep 30",dsort:8,urgent:false,ielts:6.5,src:"uct.ac.za"}
+  ];
+  var FIELD_LABELS={"data science":"Data Science","computer science":"Computer Science","artificial intelligence":"Artificial Intelligence","business":"Business","design / hci":"Design / HCI","public health":"Public Health","engineering":"Engineering","environment":"Environment","liberal arts":"Liberal Arts"};
+  var FIELD_SYN={
+    "data science":["data science","data","analytics","machine learning"," ml ","дані","аналітик"],
+    "computer science":["computer science"," cs ","computing","software","informatics","programming","coding","комп'ютер","компʼютер","інформатик","програмуванн","софт"],
+    "artificial intelligence":["artificial intelligence"," ai ","deep learning","neural","штучний інтелект","штучн","нейрон"],
+    "business":["business","management"," mba ","finance","marketing","entrepreneur","бізнес","менеджмент","фінанс","маркетинг","підприєм"],
+    "design / hci":["design"," hci ","human-computer","human computer"," ux ","interaction","дизайн","взаємоді"],
+    "public health":["public health","health","medicine","epidemi","medical","здоров","медицин","громадськ"],
+    "engineering":["engineering","robotics","robot","mechanical","electrical","autonomous","інженер","робот","механік"],
+    "environment":["environment","sustainab","climate","ecology","natural resource","довкіл","екологі","клімат","природн"],
+    "liberal arts":["liberal arts","humanities","philosophy","liberal","гуманітар","вільні мистецтв"]
+  };
+  var REGION_OF={Germany:"Europe",Netherlands:"Europe",Ireland:"Europe",Finland:"Europe",Iceland:"Europe",China:"Asia",Taiwan:"Asia","South Korea":"Asia",Japan:"Asia",Singapore:"Asia","Saudi Arabia":"Middle East",UAE:"Middle East",Qatar:"Middle East",Canada:"North America",Mexico:"Latin America",Brazil:"Latin America",Australia:"Oceania","New Zealand":"Oceania","South Africa":"Africa"};
+  var REGIONS=["Europe","Asia","Middle East","North America","Latin America","Oceania","Africa"];
+  var COUNTRIES=Object.keys(REGION_OF);
+
+  var elRegion=document.getElementById("f-region"),elCountry=document.getElementById("f-country"),elField=document.getElementById("f-field"),
+      elLevel=document.getElementById("f-level"),elBudget=document.getElementById("f-budget"),elSort=document.getElementById("f-sort");
+  function locCountry(c){return lang==="uk"?(COUNTRY_UK[c]||c):c;}
+  function locRegion(r){return lang==="uk"?(REGION_UK[r]||r):r;}
+  function locField(k){return lang==="uk"?(FIELD_UK[k]||FIELD_LABELS[k]):FIELD_LABELS[k];}
+  function opt(v,t){var o=document.createElement("option");o.value=v;o.textContent=t;return o;}
+  function fillCountries(){
+    elCountry.innerHTML="";elCountry.appendChild(opt("",T("opt_allc")));
+    COUNTRIES.filter(function(c){return !state.region||REGION_OF[c]===state.region;})
+      .sort(function(a,b){return locCountry(a).localeCompare(locCountry(b),lang);})
+      .forEach(function(c){elCountry.appendChild(opt(c,locCountry(c)));});
+    elCountry.value=state.country;
+  }
+  function buildSelects(){
+    elRegion.innerHTML="";elRegion.appendChild(opt("",T("opt_anywhere")));REGIONS.forEach(function(r){elRegion.appendChild(opt(r,locRegion(r)));});elRegion.value=state.region;
+    fillCountries();
+    elField.innerHTML="";elField.appendChild(opt("",T("opt_anyfield")));Object.keys(FIELD_LABELS).forEach(function(k){elField.appendChild(opt(k,locField(k)));});elField.value=state.field;
+    elLevel.innerHTML="";elLevel.appendChild(opt("",T("opt_anylevel")));elLevel.appendChild(opt("MSc","MSc"));elLevel.appendChild(opt("BSc","BSc"));elLevel.value=state.level;
+    elBudget.innerHTML="";elBudget.appendChild(opt("",T("opt_nolimit")));elBudget.appendChild(opt("500",T("opt_free")));["5000","15000","25000"].forEach(function(v){elBudget.appendChild(opt(v,"≤ €"+parseInt(v,10).toLocaleString()));});elBudget.value=state.budget;
+    elSort.innerHTML="";[["match","sort_match"],["tuition","sort_tuition"],["deadline","sort_deadline"],["ielts","sort_ielts"]].forEach(function(p){elSort.appendChild(opt(p[0],T(p[1])));});elSort.value=state.sort;
+  }
+
+  var state={q:"",region:"",country:"",field:"",level:"",budget:"",freeOnly:false,sort:"match"},parsed={};
+
+  function parseQuery(raw){
+    var q=(" "+raw.toLowerCase()+" ").replace(/[,.]/g," ");
+    var p={budget:null,freeIntent:false,level:"",fields:[],countries:[],regions:[]};
+    if(/free|no tuition|gratis|zero tuition|tuition[- ]free|безкоштовн|безплатн|безоплатн|даром/.test(q)){p.freeIntent=true;p.budget=500;}
+    var mk=q.match(/(?:under|below|max|less than|up to|до|менше|під|<|≤)?\s*€?\s*(\d{1,3})\s*(?:k|к|тис)/);
+    var me=q.match(/(?:under|below|max|less than|up to|до|менше|під|<|≤)\s*€?\s*(\d{3,6})/);
+    if(mk)p.budget=Math.min(p.budget||1e9,parseInt(mk[1],10)*1000);
+    else if(me)p.budget=Math.min(p.budget||1e9,parseInt(me[1],10));
+    if(/master|msc|graduate|postgrad|магістр|маґістр/.test(q))p.level="MSc";
+    else if(/bachelor|bsc|undergrad|бакалавр/.test(q))p.level="BSc";
+    Object.keys(FIELD_SYN).forEach(function(f){if(FIELD_SYN[f].some(function(s){return q.indexOf(s.trim())>-1;}))p.fields.push(f);});
+    COUNTRIES.forEach(function(c){if(q.indexOf(c.toLowerCase())>-1||q.indexOf((COUNTRY_UK[c]||"").toLowerCase())>-1)p.countries.push(c);});
+    if(/asia|азі/.test(q))p.regions.push("Asia");
+    if(/europe|європ/.test(q))p.regions.push("Europe");
+    if(/middle east|gulf|близьк|перськ/.test(q))p.regions.push("Middle East");
+    if(/latin america|south america|латинськ|південн. америк/.test(q))p.regions.push("Latin America");
+    if(/oceania|australia|new zealand|океані|австралі|нова зеланді/.test(q))p.regions.push("Oceania");
+    if(/africa|африк/.test(q))p.regions.push("Africa");
+    if(/scholarship|stipend|funded|funding|fellowship|стипенд|грант|фінансуванн/.test(q))p._sch=true;
+    return p;
+  }
+  function score(d,p){
+    if(!p.fields.length&&!p.countries.length&&!p.regions.length&&!p.level&&p.budget===null&&!p.freeIntent&&!p._sch)return 0;
+    var s=0;
+    if(p.fields.indexOf(d.field)>-1)s+=4;
+    if(p.countries.indexOf(d.country)>-1)s+=3;
+    if(p.regions.indexOf(REGION_OF[d.country])>-1)s+=2;
+    if(p.level&&d.level===p.level)s+=2;
+    if(p.freeIntent&&d.tuition<=500)s+=3;
+    if(p.budget!==null&&d.tuition<=p.budget)s+=2;
+    if(p._sch&&/scholarship|stipend|funding|fellowship/i.test(d.tnote))s+=3;
+    return s;
+  }
+  function why(d,p){
+    var bits=[],free=d.tuition<=500;
+    if(p.fields.indexOf(d.field)>-1)bits.push(lang==="uk"?("англомовний "+LEVEL_UK[d.level]+" з "+locField(d.field)):("English "+d.level+" in "+FIELD_LABELS[d.field]));
+    else bits.push(T("why_en"));
+    if(p.countries.indexOf(d.country)>-1)bits.push((lang==="uk"?"в ":"in ")+locCountry(d.country));
+    else if(p.regions.indexOf(REGION_OF[d.country])>-1)bits.push((lang==="uk"?"в ":"in ")+locCountry(d.country)+" ("+locRegion(REGION_OF[d.country])+")");
+    if(p._sch&&/scholarship|stipend|funding|fellowship/i.test(d.tnote))bits.push(T("why_funding"));
+    else if(free)bits.push(T("why_free"));
+    else if(p.budget!==null&&d.tuition<=p.budget)bits.push(lang==="uk"?("у межах бюджету ≤ €"+p.budget.toLocaleString()):("within your ≤ €"+p.budget.toLocaleString()+" budget"));
+    var out=[],seen={};bits.forEach(function(b){if(!seen[b]){seen[b]=1;out.push(b);}});
+    return out.slice(0,3).join(" · ");
+  }
+  function euro(n){return n===0?"€0":"€"+n.toLocaleString();}
+  function ukPlural(n){var a=n%10,b=n%100;if(a===1&&b!==11)return T("prog_one");if(a>=2&&a<=4&&(b<12||b>14))return T("prog_few");return T("prog_many");}
+  function countText(n,hasQ){
+    if(lang==="uk")return (hasQ?"Знайдено ":"")+"<b>"+n+"</b> "+ukPlural(n);
+    return "<b>"+n+"</b> "+(n===1?T("prog_one"):T("prog_many"))+(hasQ?T("matched"):"");
+  }
+
+  var list=document.getElementById("list"),countEl=document.getElementById("count"),io=null;
+  function observeReveal(){
+    if(io)io.disconnect();
+    io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){if(e.isIntersecting){var c=e.target;c.classList.add("in");io.unobserve(c);
+        setTimeout(function(){c.classList.remove("reveal");c.classList.remove("in");c.style.transitionDelay="";},700);}});
+    },{threshold:.08,rootMargin:"0px 0px -6% 0px"});
+    var i=0;document.querySelectorAll(".card.reveal").forEach(function(c){c.style.transitionDelay=Math.min(i,8)*40+"ms";i++;io.observe(c);});
+  }
+  function render(reveal){
+    if(reveal===undefined)reveal=true;reveal=reveal&&!reduce;
+    parsed=parseQuery(state.q);
+    var rows=DATA.filter(function(d){
+      if(state.region&&REGION_OF[d.country]!==state.region)return false;
+      if(state.country&&d.country!==state.country)return false;
+      if(state.field&&d.field!==state.field)return false;
+      if(state.level&&d.level!==state.level)return false;
+      if(state.budget&&d.tuition>parseInt(state.budget,10))return false;
+      if(state.freeOnly&&d.tuition>3000)return false;
+      return true;
+    }).map(function(d){return{d:d,sc:score(d,parsed)};});
+    var hasQ=state.q.trim().length>0;
+    if(hasQ)rows=rows.filter(function(r){return r.sc>0;});
+    rows.sort(function(a,b){
+      if(state.sort==="tuition")return a.d.tuition-b.d.tuition||a.d.dsort-b.d.dsort;
+      if(state.sort==="deadline")return a.d.dsort-b.d.dsort;
+      if(state.sort==="ielts")return a.d.ielts-b.d.ielts;
+      return b.sc-a.sc||a.d.tuition-b.d.tuition;
+    });
+    countEl.innerHTML=countText(rows.length,hasQ);
+    list.innerHTML="";
+    if(!rows.length){list.innerHTML='<div class="empty"><b>'+T("empty_title")+'</b>'+T("empty_body")+'</div>';return;}
+    rows.forEach(function(o){
+      var d=o.d,free=d.tuition<=500,low=d.tuition>0&&d.tuition<=3000;
+      var tv=(free||low)?'<span class="v big free">'+euro(d.tuition)+'</span>':'<span class="v big">'+euro(d.tuition)+'</span>';
+      var el=document.createElement("article");el.className="card"+(reveal?" reveal":"");
+      el.innerHTML=
+        '<div class="top"><div><h3>'+d.program+'</h3><div class="uni">'+d.flag+' '+d.uni+' · '+d.city+'</div></div><span class="lvl">'+d.level+'</span></div>'+
+        (hasQ?'<div class="why"><b>'+T("whylabel")+'</b>'+why(d,parsed)+'.</div>':'')+
+        '<div class="facts">'+
+          '<div class="fact"><span class="k">'+T("fact_tuition")+'</span>'+tv+'<span class="note">'+d.tnote+'</span></div>'+
+          '<div class="fact"><span class="k">'+T("fact_deadline")+'</span><span class="v'+(d.urgent?' soon':'')+'">'+d.deadline+'</span>'+(d.urgent?'<span class="note">'+T("closing")+'</span>':'')+'</div>'+
+          '<div class="fact"><span class="k">'+T("fact_ielts")+'</span><span class="v">'+d.ielts.toFixed(1)+'</span></div>'+
+          '<div class="fact"><span class="k">'+T("fact_lang")+'</span><span class="v">'+T("lang_english")+d.eng+'%</span></div>'+
+        '</div>'+
+        '<div class="foot"><span class="src">'+T("source")+' '+d.src+' '+T("checked")+'</span><a class="lnk" href="#" onclick="return false">'+T("official")+'</a></div>';
+      list.appendChild(el);
+    });
+    if(reveal)observeReveal();
+  }
+
+  var qEl=document.getElementById("q");
+  function run(){state.q=qEl.value;render(true);}
+  document.getElementById("go").addEventListener("click",run);
+  qEl.addEventListener("keydown",function(e){if(e.key==="Enter")run();});
+  qEl.addEventListener("input",function(){state.q=qEl.value;render(false);});
+  document.querySelectorAll(".chip").forEach(function(c){c.addEventListener("click",function(){qEl.value=c._q;state.q=c._q;render(true);qEl.focus();});});
+  elRegion.addEventListener("change",function(){state.region=this.value;state.country="";fillCountries();render(true);});
+  elCountry.addEventListener("change",function(){state.country=this.value;render(true);});
+  elField.addEventListener("change",function(){state.field=this.value;render(true);});
+  elLevel.addEventListener("change",function(){state.level=this.value;render(true);});
+  elBudget.addEventListener("change",function(){state.budget=this.value;render(true);});
+  document.getElementById("f-free").addEventListener("change",function(){state.freeOnly=this.checked;render(true);});
+  elSort.addEventListener("change",function(){state.sort=this.value;render(true);});
+  document.getElementById("reset").addEventListener("click",function(){
+    state.region=state.country=state.field=state.level=state.budget="";state.freeOnly=false;
+    document.getElementById("f-free").checked=false;buildSelects();render(true);
+  });
+
+  function applyLang(){
+    document.documentElement.setAttribute("lang",lang);
+    document.querySelectorAll("[data-i18n]").forEach(function(el){el.textContent=T(el.getAttribute("data-i18n"));});
+    document.querySelectorAll("[data-i18n-ph]").forEach(function(el){el.setAttribute("placeholder",T(el.getAttribute("data-i18n-ph")));});
+    document.querySelectorAll(".chip").forEach(function(c){var i=c.getAttribute("data-qi");c.textContent=T("chip"+i);c._q=T("q"+i);});
+    langbtn.textContent=T("langbtn");
+    buildSelects();render(true);
+  }
+  var langbtn=document.getElementById("langbtn");
+  langbtn.addEventListener("click",function(){lang=(lang==="uk"?"en":"uk");applyLang();});
+
+  var root=document.documentElement,tb=document.getElementById("themebtn");
+  function isDark(){return root.getAttribute("data-theme")==="dark";}
+  function paintTheme(){tb.textContent=isDark()?"☀":"☾";}
+  tb.addEventListener("click",function(){root.setAttribute("data-theme",isDark()?"light":"dark");paintTheme();});
+  paintTheme();
+
+  applyLang();
+})();
+</script>
