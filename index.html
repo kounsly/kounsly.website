@@ -92,6 +92,9 @@
 
   .searchbox{max-width:660px;margin:28px auto 0;display:flex;gap:9px;background:var(--panel);border:1.5px solid var(--brd-2);border-radius:16px;padding:8px 8px 8px 18px;box-shadow:0 10px 40px -18px color-mix(in srgb,var(--accent) 55%,transparent)}
   .searchbox:focus-within{border-color:var(--accent)}
+  :root[data-theme="dark"] .searchbox{background:rgba(32,34,54,.82);border:1.5px solid rgba(162,158,255,.42);backdrop-filter:blur(10px);box-shadow:0 0 0 1px rgba(138,134,255,.14), 0 20px 52px -18px rgba(0,0,0,.9), 0 0 46px -10px rgba(138,134,255,.32)}
+  :root[data-theme="dark"] .searchbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(138,134,255,.28), 0 20px 52px -18px rgba(0,0,0,.9)}
+  :root[data-theme="dark"] .searchbox input::placeholder{color:#9195b6}
   .searchbox input{flex:1;border:0;background:none;color:var(--text);font:inherit;font-size:16px;padding:13px 0}
   .searchbox input::placeholder{color:var(--faint)}
   .searchbox input:focus{outline:none}
