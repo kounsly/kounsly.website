@@ -77,11 +77,11 @@
   .hills .h-back{fill:rgba(126,122,214,.20)}
   .hills .h-mid{fill:rgba(91,87,232,.26)}
   .hills .h-front{fill:rgba(74,84,196,.34)}
-  .hills .snow{fill:rgba(255,255,255,.85)}
+  .hills .snow{fill:#ffffff}
   :root[data-theme="dark"] .hills .h-back{fill:rgba(206,210,246,.12)}
   :root[data-theme="dark"] .hills .h-mid{fill:rgba(226,229,255,.20)}
   :root[data-theme="dark"] .hills .h-front{fill:rgba(244,246,255,.32)}
-  :root[data-theme="dark"] .hills .snow{fill:rgba(255,255,255,.55)}
+  :root[data-theme="dark"] .hills .snow{fill:#eef0ff}
   .hero-inner{position:relative;z-index:3}
 
   .kicker{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;letter-spacing:.03em;color:#4038c4;background:rgba(255,255,255,.95);border:1px solid #fff;box-shadow:0 4px 14px -6px rgba(80,60,120,.5);border-radius:999px;padding:6px 14px;margin-bottom:18px}
@@ -180,13 +180,13 @@
 
 <section class="hero">
   <canvas class="stars" aria-hidden="true"></canvas>
-  <div class="sky"><div class="sun"></div><div class="moon"></div></div>
+  <div class="sky"><div class="moon"></div></div>
   <svg class="hills" viewBox="0 0 1200 340" preserveAspectRatio="none" aria-hidden="true">
     <path class="h-back" d="M0 252 C150 224 260 262 384 230 S624 214 760 246 S1010 218 1200 242 L1200 340 L0 340 Z"/>
     <path class="h-mid" d="M0 288 L130 240 L220 278 L350 210 L478 272 L566 238 L706 196 L824 262 L946 224 L1066 264 L1200 230 L1200 340 L0 340 Z"/>
     <path class="h-front" d="M0 302 L165 252 L258 288 L436 214 L524 262 L612 184 L722 260 L862 238 L982 286 L1122 248 L1200 278 L1200 340 L0 340 Z"/>
-    <path class="snow" d="M612 184 L596 208 L606 203 L612 196 L619 203 L629 208 Z"/>
-    <path class="snow" d="M436 214 L423 236 L432 231 L436 226 L441 231 L450 236 Z"/>
+    <path class="snow" d="M612 184 L587.2 206 L643.8 206 Z"/>
+    <path class="snow" d="M436 214 L387.9 234 L472.7 234 Z"/>
   </svg>
   <div class="hero-inner">
     <h1><span data-i18n="h1a"></span> <span class="grad-text" data-i18n="h1b"></span></h1>
