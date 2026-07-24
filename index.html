@@ -56,19 +56,33 @@
   .iconbtn{font:inherit;font-size:13px;font-weight:600;line-height:1;color:var(--muted);background:var(--panel);border:1px solid var(--brd-2);border-radius:9px;padding:6px 10px;cursor:pointer}
   .iconbtn:hover{color:var(--text)}
 
-  .hero{position:relative;overflow:hidden;text-align:center;padding:66px 20px 82px;
+  .hero{position:relative;overflow:hidden;text-align:center;padding:74px 20px 134px;
     background:
-      radial-gradient(58% 40% at 50% 82%, rgba(255,206,150,.85), rgba(255,206,150,0) 66%),
-      linear-gradient(180deg,#ECEAFB 0%,#F1E7F1 40%,#FBE7D6 68%,var(--bg) 100%);}
+      radial-gradient(60% 42% at 50% 86%, rgba(255,206,150,.9), rgba(255,206,150,0) 66%),
+      linear-gradient(180deg,#ECEAFB 0%,#F1E7F1 40%,#FBE7D6 70%,var(--bg) 100%);}
   :root[data-theme="dark"] .hero{background:
-      radial-gradient(56% 40% at 50% 80%, rgba(150,152,235,.30), transparent 66%),
-      linear-gradient(180deg,#0A0C1E 0%,#0E1230 42%,#17204A 72%,var(--bg) 100%);}
+      radial-gradient(58% 42% at 50% 84%, rgba(150,152,235,.28), transparent 66%),
+      linear-gradient(180deg,#0A0C1E 0%,#0E1230 42%,#17204A 74%,var(--bg) 100%);}
   .hero .stars{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .3s}
   :root[data-theme="dark"] .hero .stars{opacity:1}
-  .hero .hills{position:absolute;left:0;right:0;bottom:0;width:100%;height:150px;z-index:1;pointer-events:none}
-  :root[data-theme="dark"] .hills .h-back{fill:rgba(224,228,255,.15)}
-  :root[data-theme="dark"] .hills .h-front{fill:rgba(241,244,255,.30)}
-  .hero-inner{position:relative;z-index:2}
+  .sky{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+  .sun{position:absolute;right:13%;bottom:44px;width:132px;height:132px;border-radius:50%;
+    background:radial-gradient(circle,#FFF1D8 0%,#FFD68F 46%,rgba(255,201,128,.18) 70%,transparent 75%);filter:blur(.5px)}
+  .moon{display:none;position:absolute;right:15%;top:46px;width:78px;height:78px;border-radius:50%;
+    background:radial-gradient(circle at 40% 38%,#F6F5FF 0%,#DEE0F5 56%,#BCC0E0 100%);
+    box-shadow:0 0 36px 10px rgba(188,194,255,.26), inset -9px -9px 18px rgba(120,126,175,.38)}
+  :root[data-theme="dark"] .sun{display:none}
+  :root[data-theme="dark"] .moon{display:block}
+  .hero .hills{position:absolute;left:0;right:0;bottom:0;width:100%;height:188px;z-index:2;pointer-events:none}
+  .hills .h-back{fill:rgba(126,122,214,.20)}
+  .hills .h-mid{fill:rgba(91,87,232,.26)}
+  .hills .h-front{fill:rgba(74,84,196,.34)}
+  .hills .snow{fill:rgba(255,255,255,.85)}
+  :root[data-theme="dark"] .hills .h-back{fill:rgba(206,210,246,.12)}
+  :root[data-theme="dark"] .hills .h-mid{fill:rgba(226,229,255,.20)}
+  :root[data-theme="dark"] .hills .h-front{fill:rgba(244,246,255,.32)}
+  :root[data-theme="dark"] .hills .snow{fill:rgba(255,255,255,.55)}
+  .hero-inner{position:relative;z-index:3}
 
   .kicker{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;letter-spacing:.03em;color:#4038c4;background:rgba(255,255,255,.95);border:1px solid #fff;box-shadow:0 4px 14px -6px rgba(80,60,120,.5);border-radius:999px;padding:6px 14px;margin-bottom:18px}
   :root[data-theme="dark"] .kicker{color:#dfe0ff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);box-shadow:none}
@@ -166,12 +180,15 @@
 
 <section class="hero">
   <canvas class="stars" aria-hidden="true"></canvas>
-  <svg class="hills" viewBox="0 0 900 320" preserveAspectRatio="none" aria-hidden="true">
-    <path class="h-back" d="M0 200 L120 150 L250 205 L360 140 L500 210 L640 150 L780 200 L900 165 L900 320 L0 320 Z" fill="rgba(91,87,232,.26)"/>
-    <path class="h-front" d="M0 250 L160 210 L320 258 L470 205 L620 255 L760 215 L900 250 L900 320 L0 320 Z" fill="rgba(78,123,239,.26)"/>
+  <div class="sky"><div class="sun"></div><div class="moon"></div></div>
+  <svg class="hills" viewBox="0 0 1200 340" preserveAspectRatio="none" aria-hidden="true">
+    <path class="h-back" d="M0 252 C150 224 260 262 384 230 S624 214 760 246 S1010 218 1200 242 L1200 340 L0 340 Z"/>
+    <path class="h-mid" d="M0 288 L130 240 L220 278 L350 210 L478 272 L566 238 L706 196 L824 262 L946 224 L1066 264 L1200 230 L1200 340 L0 340 Z"/>
+    <path class="h-front" d="M0 302 L165 252 L258 288 L436 214 L524 262 L612 184 L722 260 L862 238 L982 286 L1122 248 L1200 278 L1200 340 L0 340 Z"/>
+    <path class="snow" d="M612 184 L596 208 L606 203 L612 196 L619 203 L629 208 Z"/>
+    <path class="snow" d="M436 214 L423 236 L432 231 L436 226 L441 231 L450 236 Z"/>
   </svg>
   <div class="hero-inner">
-    <div class="kicker" data-i18n="kicker"></div>
     <h1><span data-i18n="h1a"></span> <span class="grad-text" data-i18n="h1b"></span></h1>
     <p data-i18n="lede"></p>
     <div class="searchbox">
