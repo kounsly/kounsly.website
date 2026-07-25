@@ -40,7 +40,27 @@ ASK_LIMIT_PER_HOUR = int(os.getenv("KOUNSLY_ASK_LIMIT", "20"))
 _ask_log: dict[str, deque[float]] = defaultdict(deque)
 
 app = FastAPI(title="Kounsly", docs_url=None, redoc_url=None)
-app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+
+
+class NoStoreStatic(StaticFiles):
+    """Serve app.js/app.css uncached.
+
+    The page is already no-store; leaving its scripts cacheable means a deploy
+    ships new markup against last week's JavaScript, which looks like a bug in
+    the feature rather than a stale file. These are tens of kilobytes — when
+    there is traffic worth optimising for, switch to hashed filenames.
+    """
+
+    def is_not_modified(self, *args, **kwargs) -> bool:  # noqa: D102
+        return False
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
+app.mount("/static", NoStoreStatic(directory=ROOT / "static"), name="static")
 
 # Every column is prefixed with the table alias: programs_fts carries columns of
 # the same names, so bare `name` is ambiguous the moment a text query joins it.
@@ -264,6 +284,7 @@ def search(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=60),
     ai: bool = True,
+    group: str = "non_eu",   # applicant group from the profile
 ) -> dict[str, Any]:
     load_vectors()
     today_mmdd = date.today().month * 100 + date.today().day
@@ -315,23 +336,36 @@ def search(
     vec = query_vector(interpreted.get("subject") or q) if q.strip() else None
 
     if vec is not None:
-        return semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted)
-    return text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted)
+        return semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted, group)
+    return text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted, group)
 
 
-def _base_sql(where: list[str], join: str, rank: str, order: str) -> str:
-    return f"""
+# Which stated deadlines apply to a given applicant. A Ukrainian passport holder
+# without EU residence must never be shown an EU-only date as "your deadline" —
+# it is the difference between applying in March and applying in July.
+GROUP_DEADLINES = {
+    "non_eu": ("everyone", "non_eu", "session", "early_bird"),
+    "eu_eea": ("everyone", "eu_eea", "germany", "session", "early_bird"),
+}
+
+
+def _base_sql(where: list[str], join: str, rank: str, order: str, group: str = "non_eu") -> str:
+    groups = GROUP_DEADLINES.get(group, GROUP_DEADLINES["non_eu"])
+    sql = f"""
         SELECT {CARD_FIELDS},
                {rank} AS rank_score,
                (SELECT MIN((d.mmdd - :today + 10000) % 10000)
-                  FROM program_deadlines d WHERE d.uid = p.uid) AS next_deadline
+                  FROM program_deadlines d
+                 WHERE d.uid = p.uid
+                   AND (d.applies_to IS NULL OR d.applies_to IN {{groups}})) AS next_deadline
         FROM programs p {join}
         WHERE {' AND '.join(where)}
         {order}
     """
+    return sql.replace("{groups}", "(" + ",".join(f"'{g}'" for g in groups) + ")")
 
 
-def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted):
+def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted, group="non_eu"):
     """Rank the filtered set by meaning, then page in Python.
 
     Scoring all matches in memory is fine at catalogue scale — a few thousand
@@ -342,7 +376,7 @@ def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interp
 
     conn = db()
     try:
-        rows = conn.execute(_base_sql(where, "", "0", ""), {**params, "today": today_mmdd}).fetchall()
+        rows = conn.execute(_base_sql(where, "", "0", "", group), {**params, "today": today_mmdd}).fetchall()
     except sqlite3.OperationalError as e:
         raise HTTPException(400, f"bad query: {e}") from e
     finally:
@@ -395,7 +429,7 @@ def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interp
     }
 
 
-def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted):
+def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted, group="non_eu"):
     """Fallback when there are no vectors or no credentials: FTS5 as before."""
     terms = fts_terms(q) if q.strip() else []
     join, rank = "", "0"
@@ -405,7 +439,7 @@ def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted)
         rank = "f.rank"
 
     order = f"ORDER BY {SORTS.get(sort, SORTS['match'])} LIMIT :limit OFFSET :offset"
-    sql = _base_sql(where, join, rank, order)
+    sql = _base_sql(where, join, rank, order, group)
     count_sql = f"SELECT COUNT(*) FROM programs p {join} WHERE {' AND '.join(where)}"
 
     conn = db()
@@ -483,11 +517,20 @@ def program(uid: str) -> dict[str, Any]:
 
 # ---------- grounded assistant ----------
 
+class Profile(BaseModel):
+    citizenship: Optional[str] = None      # UA | EU | OTHER
+    status: Optional[str] = None           # none | protection
+    education: Optional[str] = None        # school | bachelor | master
+    ielts: Optional[str] = None
+    toefl: Optional[str] = None
+
+
 class Ask(BaseModel):
     uid: str
     question: str = Field(max_length=600)
     selection: Optional[str] = Field(None, max_length=2000)
     lang: str = "uk"
+    profile: Optional[Profile] = None
 
 
 SYSTEM = """You are Kounsly's admissions assistant. You answer about ONE study programme,
@@ -506,6 +549,18 @@ RULES
   it helps the reader recognise it on the university's page.
 - If the user asks about their personal eligibility, answer with what the stated
   requirements are, and be explicit that only the university can confirm a decision.
+
+ABOUT THE READER
+- You may be given their citizenship, status, education and test scores. Use them
+  only to pick which stated fact applies and to compare numbers: "the page asks
+  IELTS 6.5, you have 6.0, that is 0.5 short".
+- Their citizenship decides which stated deadline is theirs. Say which date is
+  theirs and why.
+- Refugee or temporary-protection status: NEVER state what it changes. Fees and
+  admission rules for protected status differ by country and are not on this
+  page. Say that the page does not cover it and that they must ask the
+  university, and point at the official link. Guessing here would be the single
+  most damaging thing you could do.
 """
 
 CONTEXT_FIELDS = [
@@ -648,6 +703,10 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     language = {"uk": "Ukrainian", "en": "English"}.get(body.lang, "English")
     parts = [SYSTEM.format(language=language), "PROGRAMME DATA:",
              build_context(row_to_dict(row), body.lang)]
+    if body.profile:
+        told = {k: v for k, v in body.profile.model_dump().items() if v}
+        if told:
+            parts.append("READER PROFILE: " + ", ".join(f"{k}={v}" for k, v in told.items()))
     if body.selection:
         parts.append(f'The user highlighted this text on the page:\n"""{body.selection}"""')
     parts.append(f"USER QUESTION: {body.question}")
