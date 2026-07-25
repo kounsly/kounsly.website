@@ -1,0 +1,4 @@
+# Pinned to the versions this was tested against locally.
+fastapi==0.140.0
+uvicorn[standard]==0.51.0
+google-genai==2.14.0
