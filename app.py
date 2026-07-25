@@ -316,13 +316,37 @@ def gemini_client():
 
     existing = getattr(_clients, "c", None)
     if existing is None:
-        if key := os.getenv("GEMINI_API_KEY"):
+        if creds := service_account_credentials():
+            existing = genai.Client(vertexai=True, project=GCP_PROJECT,
+                                    location=GCP_LOCATION, credentials=creds)
+        elif key := os.getenv("GEMINI_API_KEY"):
             existing = genai.Client(api_key=key)
         else:
             existing = genai.Client(vertexai=True, project=GCP_PROJECT, location=GCP_LOCATION)
         _clients.c = existing
         _client_refs.append(existing)
     return existing
+
+
+def service_account_credentials():
+    """Credentials from a service-account JSON passed as an env var.
+
+    The container has no gcloud and no metadata server, so ADC is not available
+    in production. Taking the key as a variable rather than a mounted file keeps
+    the deploy a single Coolify setting with nothing to copy onto the host.
+    """
+    raw = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not raw:
+        return None
+    try:
+        from google.oauth2 import service_account
+
+        return service_account.Credentials.from_service_account_info(
+            json.loads(raw), scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+    except Exception as e:  # noqa: BLE001 — a malformed key must not take search down
+        print(f"GOOGLE_SERVICE_ACCOUNT_JSON present but unusable: {str(e)[:200]}")
+        return None
 
 
 @app.post("/api/ask")
@@ -383,7 +407,7 @@ def assistant_available() -> bool:
     credentials looks like a site that simply has no chat box — not like a
     broken feature that errors when a visitor touches it.
     """
-    if os.getenv("GEMINI_API_KEY"):
+    if os.getenv("GEMINI_API_KEY") or service_account_credentials():
         return True
     try:
         import google.auth
