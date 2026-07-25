@@ -284,7 +284,6 @@ def search(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=60),
     ai: bool = True,
-    group: str = "non_eu",   # applicant group from the profile
 ) -> dict[str, Any]:
     load_vectors()
     today_mmdd = date.today().month * 100 + date.today().day
@@ -336,36 +335,23 @@ def search(
     vec = query_vector(interpreted.get("subject") or q) if q.strip() else None
 
     if vec is not None:
-        return semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted, group)
-    return text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted, group)
+        return semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted)
+    return text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted)
 
 
-# Which stated deadlines apply to a given applicant. A Ukrainian passport holder
-# without EU residence must never be shown an EU-only date as "your deadline" —
-# it is the difference between applying in March and applying in July.
-GROUP_DEADLINES = {
-    "non_eu": ("everyone", "non_eu", "session", "early_bird"),
-    "eu_eea": ("everyone", "eu_eea", "germany", "session", "early_bird"),
-}
-
-
-def _base_sql(where: list[str], join: str, rank: str, order: str, group: str = "non_eu") -> str:
-    groups = GROUP_DEADLINES.get(group, GROUP_DEADLINES["non_eu"])
-    sql = f"""
+def _base_sql(where: list[str], join: str, rank: str, order: str) -> str:
+    return f"""
         SELECT {CARD_FIELDS},
                {rank} AS rank_score,
                (SELECT MIN((d.mmdd - :today + 10000) % 10000)
-                  FROM program_deadlines d
-                 WHERE d.uid = p.uid
-                   AND (d.applies_to IS NULL OR d.applies_to IN {{groups}})) AS next_deadline
+                  FROM program_deadlines d WHERE d.uid = p.uid) AS next_deadline
         FROM programs p {join}
         WHERE {' AND '.join(where)}
         {order}
     """
-    return sql.replace("{groups}", "(" + ",".join(f"'{g}'" for g in groups) + ")")
 
 
-def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted, group="non_eu"):
+def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted):
     """Rank the filtered set by meaning, then page in Python.
 
     Scoring all matches in memory is fine at catalogue scale — a few thousand
@@ -376,7 +362,7 @@ def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interp
 
     conn = db()
     try:
-        rows = conn.execute(_base_sql(where, "", "0", "", group), {**params, "today": today_mmdd}).fetchall()
+        rows = conn.execute(_base_sql(where, "", "0", ""), {**params, "today": today_mmdd}).fetchall()
     except sqlite3.OperationalError as e:
         raise HTTPException(400, f"bad query: {e}") from e
     finally:
@@ -429,7 +415,7 @@ def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interp
     }
 
 
-def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted, group="non_eu"):
+def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted):
     """Fallback when there are no vectors or no credentials: FTS5 as before."""
     terms = fts_terms(q) if q.strip() else []
     join, rank = "", "0"
@@ -439,7 +425,7 @@ def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted,
         rank = "f.rank"
 
     order = f"ORDER BY {SORTS.get(sort, SORTS['match'])} LIMIT :limit OFFSET :offset"
-    sql = _base_sql(where, join, rank, order, group)
+    sql = _base_sql(where, join, rank, order)
     count_sql = f"SELECT COUNT(*) FROM programs p {join} WHERE {' AND '.join(where)}"
 
     conn = db()

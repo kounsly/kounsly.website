@@ -143,31 +143,10 @@
 .skeleton{height:118px;border-radius:16px;background:var(--panel-2);margin-bottom:12px;
   animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.55}50%{opacity:.9}}
-/* ---------- profile ---------- */
-.profile{border-bottom:1px solid var(--brd);padding-bottom:16px;margin-bottom:4px}
-.profile .pf-hint{font-size:.76rem;color:var(--faint);line-height:1.45;margin:-4px 0 10px}
-.profile label{display:block;font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;
-  color:var(--faint);font-weight:600;margin:0 0 9px}
-.profile select,.profile input{
-  display:block;width:100%;margin-top:4px;padding:8px 10px;border-radius:9px;
-  border:1px solid var(--brd-2);background:var(--panel);color:var(--text);
-  font:inherit;font-size:.88rem;text-transform:none;letter-spacing:0;
-}
-.profile .pf-two{display:flex;gap:7px}
-.profile .pf-two input{width:50%}
 
 /* ---------- deadlines with a group ---------- */
-.deadline-row.mine{background:var(--good-soft);border-radius:8px;padding:7px 10px;border-bottom:0}
-.deadline-row.mine .date{color:var(--good)}
-.deadline-row.other{opacity:.62}
 .deadline-row .who{font-size:.78rem;color:var(--muted)}
-.deadline-row .left b{color:var(--good)}
 
-/* ---------- eligibility ---------- */
-.elig{display:flex;flex-direction:column;gap:6px;margin-bottom:4px}
-.elig-row{font-size:.88rem;padding:8px 11px;border-radius:9px;white-space:normal}
-.elig-row.ok{background:var(--good-soft);color:var(--good)}
-.elig-row.no{background:var(--warn-soft);color:var(--warn)}
 
 /* ---------- how to apply ---------- */
 .step{display:flex;gap:12px;padding:11px 0}
@@ -183,10 +162,6 @@
 .step-v a{color:var(--accent)}
 .step.missing .step-v{color:var(--muted);font-style:italic}
 .step-note{font-size:.78rem;color:var(--muted);margin-top:3px}
-.prot-note{
-  font-size:.85rem;line-height:1.55;padding:11px 13px;margin-bottom:12px;
-  border-left:3px solid var(--warn);background:var(--warn-soft);color:var(--warn);border-radius:0 9px 9px 0;
-}
 
 /* ---------- template rows ---------- */
 .grp{margin:0 0 26px}

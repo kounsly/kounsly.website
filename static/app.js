@@ -11,69 +11,17 @@
   var state = { q: "", country: "", area: "", subject: "", level: "", budget: "", free: false, sort: "match", page: 1, ai: true };
   var facets = null, current = null, asking = false;
 
-  /* ---------- profile ----------
-   * Who is reading decides which facts matter: a Ukrainian passport holder and
-   * an EU citizen are given different deadlines by the same university, and
-   * showing the wrong one is worse than showing none. Kept in localStorage —
-   * accounts arrive with the paywall.
-   *
-   * What it never does: invent a rule. Temporary-protection status changes fees
-   * and admission in ways the official pages do not state, so selecting it adds
-   * a visible "check this yourself" note rather than a number.
-   */
-  var PROFILE_DEFAULT = { citizenship: "UA", status: "none", education: "", budget: "", ielts: "", toefl: "" };
-  var profile = load_profile();
-
-  function load_profile() {
-    try {
-      return Object.assign({}, PROFILE_DEFAULT, JSON.parse(localStorage.getItem("kounsly.profile") || "{}"));
-    } catch (e) {
-      return Object.assign({}, PROFILE_DEFAULT);
-    }
-  }
-
-  function save_profile() {
-    localStorage.setItem("kounsly.profile", JSON.stringify(profile));
-  }
-
-  /** Which set of stated deadlines applies to this reader. */
-  function applicantGroup() {
-    return profile.citizenship === "EU" ? "eu_eea" : "non_eu";
-  }
-
-  function myDeadline(d) {
-    var mine = applicantGroup() === "eu_eea"
-      ? ["everyone", "eu_eea", "germany", "session", "early_bird"]
-      : ["everyone", "non_eu", "session", "early_bird"];
-    return mine.indexOf(d.applies_to || "everyone") >= 0;
-  }
-
   var LEVEL_NEEDS = { bachelor: "school", master: "bachelor", phd: "master" };
-  var EDU_RANK = { school: 1, bachelor: 2, master: 3 };
 
-  /** Arithmetic on stated facts, not a prediction: what the page requires vs
-   *  what the profile says. Silent when either side is unknown. */
-  function eligibility(p) {
-    var notes = [];
-    if (profile.education && LEVEL_NEEDS[p.degree_level]) {
-      var need = LEVEL_NEEDS[p.degree_level];
-      if ((EDU_RANK[profile.education] || 0) < EDU_RANK[need]) {
-        notes.push({ ok: false, text: T("el_need_" + need) });
-      }
-    }
-    if (profile.ielts && p.ielts) {
-      var gap = Math.round((p.ielts - parseFloat(profile.ielts)) * 10) / 10;
-      notes.push(gap > 0
-        ? { ok: false, text: T("el_ielts_gap").replace("{n}", gap).replace("{r}", p.ielts) }
-        : { ok: true, text: T("el_ielts_ok").replace("{r}", p.ielts) });
-    }
-    if (profile.toefl && p.toefl_ibt) {
-      var tgap = p.toefl_ibt - parseInt(profile.toefl, 10);
-      notes.push(tgap > 0
-        ? { ok: false, text: T("el_toefl_gap").replace("{n}", tgap).replace("{r}", p.toefl_ibt) }
-        : { ok: true, text: T("el_toefl_ok").replace("{r}", p.toefl_ibt) });
-    }
-    return notes;
+  /** What kind of deadline this is: regular, early admission, or for a stated
+   *  group of applicants — plus the semester it leads to. Descriptive only; the
+   *  site does not yet claim to know which one is the reader's. */
+  function deadlineKind(d) {
+    var bits = [];
+    if (d.applies_to && d.applies_to !== "everyone") bits.push(T("dl_" + d.applies_to));
+    else bits.push(T("dl_regular"));
+    if (d.term) bits.push(T("term_" + d.term) + " " + T("dl_semester"));
+    return bits.join(" · ");
   }
 
   var STR = {
@@ -90,20 +38,9 @@
       footer: "Kounsly — підбір англомовних програм за кордоном. Кожен факт має джерело й дату перевірки.",
       found: "знайдено", of_total: "з", programmes: "програм",
       read_as: "Зрозуміла так:", read_off: "шукати дослівно",
-      pr_title: "Мій профіль", pr_hint: "Щоб показувати саме твої дедлайни й вимоги",
-      pr_citizenship: "Громадянство", pr_ua: "Україна", pr_eu: "Країна ЄС/ЄЕЗ", pr_other: "Інша країна поза ЄС",
-      pr_status: "Статус у ЄС", pr_status_none: "немає", pr_status_prot: "тимчасовий захист / біженство",
-      pr_education: "Наявна освіта", pr_edu_any: "не вказано", pr_school: "школа", pr_bachelor: "бакалавр", pr_master: "магістр",
-      pr_budget: "Бюджет, EUR/рік", pr_tests: "Мовні тести", pr_save: "Зберегти", pr_saved: "Збережено",
-      pr_note_prot: "Статус захисту може змінювати плату й правила вступу — на офіційних сторінках цього не вказано, тому цифри нижче лишаються як у джерелі.",
       dl_everyone: "для всіх", dl_non_eu: "для не-ЄС", dl_eu_eea: "для громадян ЄС/ЄЕЗ",
       dl_germany: "для заявників з Німеччини/ЄС", dl_early_bird: "ранній вступ", dl_session: "сесія подачі",
-      dl_mine: "твоя дата", dl_not_mine: "не для твоєї групи",
-      el_need_school: "потрібен атестат — у профілі не вказано, що він є",
-      el_need_bachelor: "потрібен ступінь бакалавра — у профілі його немає",
-      el_need_master: "потрібен ступінь магістра — у профілі його немає",
-      el_ielts_gap: "IELTS: потрібно {r}, тобі бракує {n}", el_ielts_ok: "IELTS {r} — ти проходиш",
-      el_toefl_gap: "TOEFL: потрібно {r}, бракує {n} балів", el_toefl_ok: "TOEFL {r} — ти проходиш",
+      dl_regular: "звичайний вступ", dl_semester: "семестр",
       g_steps: "Як подаватися", st_reqs: "Перевір вимоги", st_portal: "Зареєструйся на порталі",
       st_deadline: "Подай заявку до", st_money: "Порахуй витрати",
       st_no_portal: "Портал подачі не вказано — шукай кнопку подачі на офіційній сторінці",
@@ -152,20 +89,9 @@
       footer: "Kounsly — English-taught degrees abroad. Every fact carries its source and the date we checked it.",
       found: "found", of_total: "of", programmes: "programmes",
       read_as: "Read as:", read_off: "search literally",
-      pr_title: "My profile", pr_hint: "So the deadlines and requirements shown are yours",
-      pr_citizenship: "Citizenship", pr_ua: "Ukraine", pr_eu: "EU/EEA country", pr_other: "Other non-EU country",
-      pr_status: "Status in the EU", pr_status_none: "none", pr_status_prot: "temporary protection / refugee",
-      pr_education: "Education so far", pr_edu_any: "not set", pr_school: "school", pr_bachelor: "bachelor", pr_master: "master",
-      pr_budget: "Budget, EUR/year", pr_tests: "Language tests", pr_save: "Save", pr_saved: "Saved",
-      pr_note_prot: "Protection status can change fees and admission rules, and the official pages do not state that — so the figures below stay exactly as the source has them.",
       dl_everyone: "for everyone", dl_non_eu: "for non-EU", dl_eu_eea: "for EU/EEA citizens",
       dl_germany: "for applicants from Germany/EU", dl_early_bird: "early admission", dl_session: "application session",
-      dl_mine: "your date", dl_not_mine: "not your group",
-      el_need_school: "a school certificate is required — your profile does not say you have one",
-      el_need_bachelor: "a bachelor's degree is required — your profile does not have one",
-      el_need_master: "a master's degree is required — your profile does not have one",
-      el_ielts_gap: "IELTS: {r} required, you are {n} short", el_ielts_ok: "IELTS {r} — you meet it",
-      el_toefl_gap: "TOEFL: {r} required, {n} points short", el_toefl_ok: "TOEFL {r} — you meet it",
+      dl_regular: "regular admission", dl_semester: "semester",
       g_steps: "How to apply", st_reqs: "Check the requirements", st_portal: "Register on the portal",
       st_deadline: "Apply by", st_money: "Add up the costs",
       st_no_portal: "No portal stated — look for the apply button on the official page",
@@ -289,50 +215,6 @@
     s.value = state.sort;
   }
 
-  /* The profile lives at the top of the filter rail: it is a filter, in the sense
-   * that it decides which of several stated facts are the reader's. */
-  function profilePanel() {
-    var aside = document.querySelector(".filters");
-    if (!aside) return;
-    var box = document.getElementById("profile");
-    if (!box) {
-      box = el("div", "fgroup profile");
-      box.id = "profile";
-      aside.insertBefore(box, aside.firstChild);
-    }
-
-    function sel(key, field, options) {
-      return "<label>" + esc(T(key)) + "<select data-pf=\"" + field + "\">" +
-        options.map(function (o) {
-          return '<option value="' + esc(o[0]) + '"' + (String(profile[field]) === o[0] ? " selected" : "") +
-            ">" + esc(T(o[1])) + "</option>";
-        }).join("") + "</select></label>";
-    }
-
-    box.innerHTML =
-      "<h4>" + esc(T("pr_title")) + "</h4>" +
-      '<div class="pf-hint">' + esc(T("pr_hint")) + "</div>" +
-      sel("pr_citizenship", "citizenship", [["UA", "pr_ua"], ["EU", "pr_eu"], ["OTHER", "pr_other"]]) +
-      sel("pr_status", "status", [["none", "pr_status_none"], ["protection", "pr_status_prot"]]) +
-      sel("pr_education", "education", [["", "pr_edu_any"], ["school", "pr_school"],
-                                        ["bachelor", "pr_bachelor"], ["master", "pr_master"]]) +
-      '<label>' + esc(T("pr_tests")) + '<span class="pf-two">' +
-        '<input data-pf="ielts" type="text" inputmode="decimal" placeholder="IELTS" value="' + esc(profile.ielts) + '">' +
-        '<input data-pf="toefl" type="text" inputmode="numeric" placeholder="TOEFL" value="' + esc(profile.toefl) + '">' +
-      "</span></label>";
-
-    box.querySelectorAll("[data-pf]").forEach(function (input) {
-      var handler = function () {
-        profile[input.getAttribute("data-pf")] = input.value.trim();
-        save_profile();
-        state.page = 1;
-        runSearch();
-        if (current) openSheet(current.uid);   // re-render with the new group
-      };
-      input.addEventListener(input.tagName === "SELECT" ? "change" : "blur", handler);
-    });
-  }
-
   function applyI18n() {
     document.querySelectorAll("[data-i18n]").forEach(function (n) { n.textContent = T(n.getAttribute("data-i18n")); });
     document.querySelectorAll("[data-i18n-ph]").forEach(function (n) { n.placeholder = T(n.getAttribute("data-i18n-ph")); });
@@ -354,7 +236,6 @@
     else if (state.budget) p.set("max_tuition", state.budget);
     if (state.free) p.set("free_only", "true");
     if (state.ai === false) p.set("ai", "false");
-    p.set("group", applicantGroup());
     p.set("sort", state.sort);
     p.set("page", state.page);
     return p.toString();
@@ -545,9 +426,24 @@
     return p[field];
   }
 
+  /** Source prose carries bare URLs and e-mail addresses ("purchased for 95 EUR:
+   *  https://…", "E-mail: international@uni-landau.de"). Escaped first, so this
+   *  can only ever turn text into a link, never inject markup. */
+  function linkifyText(s) {
+    return esc(s)
+      .replace(/(https?:\/\/[^\s<>"']+?)([.,;:)\]]*)(?=\s|$)/g,
+               '<a href="$1" target="_blank" rel="noopener">$1</a>$2')
+      .replace(/\bwww\.[^\s<>"']+?([.,;:)\]]*)(?=\s|$)/g, function (m, tail) {
+        var url = m.slice(0, m.length - tail.length);
+        return '<a href="https://' + url + '" target="_blank" rel="noopener">' + url + "</a>" + tail;
+      })
+      .replace(/\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g,
+               '<a href="mailto:$1">$1</a>');
+  }
+
   function section(title, text) {
     if (!text) return "";
-    return '<div class="sec"><h3>' + esc(title) + '</h3><div class="txt">' + esc(text) + "</div></div>";
+    return '<div class="sec"><h3>' + esc(title) + '</h3><div class="txt">' + linkifyText(text) + "</div></div>";
   }
 
   /* One template for every programme. A field the source does not state is shown
@@ -560,9 +456,9 @@
     if (value) {
       // `wide` drops the label column: for a long prose block the group heading
       // already says what it is, and repeating it wastes a third of the width.
-      if (opts.wide) return '<div class="row wide"><div class="row-v">' + esc(value) + "</div></div>";
+      if (opts.wide) return '<div class="row wide"><div class="row-v">' + linkifyText(value) + "</div></div>";
       return '<div class="row"><div class="row-k">' + esc(T(labelKey)) + "</div>" +
-        '<div class="row-v">' + esc(value) + "</div></div>";
+        '<div class="row-v">' + linkifyText(value) + "</div></div>";
     }
     if (!opts.required) return "";
     var where = p.application_url || p.source_url;
@@ -607,26 +503,17 @@
       '<div class="tile"><b>' + esc(T("f_deadline")) + "</b><span>" + (dl ? esc(dateLabel(dl)) : esc(T("not_listed"))) + "</span></div>"
     ].join("");
 
-    // Every date says who it is for, and the one that is the reader's is marked.
-    // Three unexplained dates looked like a bug; the source did distinguish them
-    // all along.
+    // Every date says what kind of deadline it is — regular, early admission, or
+    // for a particular group of applicants. Three unexplained dates read as a
+    // bug; the source distinguished them all along. Which one is *yours* waits
+    // for accounts.
     var deadlineRows = (p.deadlines || []).map(function (d) {
       var one = nextDeadline([d]);
-      var mine = myDeadline(d);
-      var whoFor = T("dl_" + (d.applies_to || "everyone"));
-      return '<div class="deadline-row' + (mine ? " mine" : " other") + '">' +
+      return '<div class="deadline-row">' +
         '<span class="date">' + esc(dateLabel(d)) + "</span>" +
-        '<span class="who">' + esc(whoFor) + (d.term ? " · " + esc(termLabel(d.term)) : "") + "</span>" +
-        '<span class="left">' + (mine ? '<b>' + esc(T("dl_mine")) + "</b> · " : "") +
-          esc(one ? daysLabel(one.days) : "") + "</span></div>";
+        '<span class="who">' + esc(deadlineKind(d)) + "</span>" +
+        '<span class="left">' + esc(one ? daysLabel(one.days) : "") + "</span></div>";
     }).join("");
-
-    var elig = eligibility(p);
-    var eligRows = elig.length
-      ? '<div class="elig">' + elig.map(function (e) {
-          return '<div class="elig-row ' + (e.ok ? "ok" : "no") + '">' + (e.ok ? "✓ " : "! ") + esc(e.text) + "</div>";
-        }).join("") + "</div>"
-      : "";
 
     var links = linkList(p);
 
@@ -660,7 +547,6 @@
         ]) +
 
         group("g_admission", [
-          eligRows ? '<div class="row wide"><div class="row-v">' + eligRows + "</div></div>" : "",
           block(p, "d_reqs", "admission_requirements_raw", { required: true }),
           block(p, "d_lang", "language_requirement_raw", { required: true })
         ]) +
@@ -718,13 +604,15 @@
       steps.push({ k: T("st_portal"), v: T("st_no_portal"), missing: true });
     }
 
-    var mineDates = (p.deadlines || []).filter(myDeadline);
-    var next = nextDeadline(mineDates.length ? mineDates : (p.deadlines || []));
-    if (next) {
+    var dates = (p.deadlines || []).slice().sort(function (a, b) {
+      return (a.month * 100 + a.day) - (b.month * 100 + b.day);
+    });
+    if (dates.length) {
       steps.push({
         k: T("st_deadline"),
-        v: "<b>" + esc(dateLabel(next)) + "</b> — " + esc(T("dl_" + (next.applies_to || "everyone"))) +
-           " · " + esc(daysLabel(next.days)),
+        v: dates.map(function (d) {
+          return "<b>" + esc(dateLabel(d)) + "</b> — " + esc(deadlineKind(d));
+        }).join("<br>"),
         raw: true
       });
     } else {
@@ -748,10 +636,7 @@
         "</div></div>";
     }).join("");
 
-    var protNote = profile.status === "protection"
-      ? '<div class="prot-note">' + esc(T("pr_note_prot")) + "</div>" : "";
-
-    return '<div class="grp"><h3>' + esc(T("g_steps")) + "</h3>" + protNote + rows + "</div>";
+    return '<div class="grp"><h3>' + esc(T("g_steps")) + "</h3>" + rows + "</div>";
   }
 
   /* Which field a link came from is what the link is *for*. Labelling them that
@@ -843,7 +728,7 @@
       fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uid: p.uid, question: question, selection: selection, lang: lang, profile: profile })
+        body: JSON.stringify({ uid: p.uid, question: question, selection: selection, lang: lang })
       })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
         .then(function (res) {
@@ -1000,7 +885,7 @@
     $("langbtn").addEventListener("click", function () {
       lang = lang === "uk" ? "en" : "uk";
       localStorage.setItem("kounsly.lang", lang);
-      applyI18n(); profilePanel(); buildSelects();
+      applyI18n(); buildSelects();
       if (current) openSheet(current.uid);
       runSearch();
     });
@@ -1009,7 +894,6 @@
   }
 
   applyI18n();
-  profilePanel();
   bind();
   bindTheme();
   fetch("/api/facets")
