@@ -250,7 +250,11 @@ RULES
   and point the user to the official page link. Do not guess.
 - Be concrete and short: 2-5 sentences, or a tight list. Quote figures exactly as stated.
 - Money: distinguish tuition from the semester contribution and from living costs.
-- Answer in {language}.
+- Answer in {language}. When that is Ukrainian, write natural literary Ukrainian —
+  no Russian words or calques slipping in ("таким образом", "такі как", "витрати
+  на проживання" is fine but "проживання" not "жильё"). Financial and admissions
+  terms in Ukrainian, with the original English term in brackets on first use if
+  it helps the reader recognise it on the university's page.
 - If the user asks about their personal eligibility, answer with what the stated
   requirements are, and be explicit that only the university can confirm a decision.
 """
