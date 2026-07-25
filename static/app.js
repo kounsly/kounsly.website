@@ -24,15 +24,23 @@
       sort_match: "За релевантністю", sort_tuition: "Найдешевші", sort_deadline: "Дедлайн найближче", sort_ielts: "Найнижчий IELTS",
       footer: "Kounsly — підбір англомовних програм за кордоном. Кожен факт має джерело й дату перевірки.",
       found: "знайдено", of_total: "з", programmes: "програм",
-      free: "Без плати за навчання", per_year: "/ рік", not_listed: "не вказано",
+      free: "Без плати за навчання", per_year: "/ рік", per_semester: "/ семестр", not_listed: "не вказано",
+      source: "Джерело:", src_checked: "перевірено",
       lvl_bachelor: "Бакалавр", lvl_master: "Магістр", lvl_phd: "PhD",
       f_tuition: "Плата за навчання", f_deadline: "Найближчий дедлайн", f_english: "Англійська", f_duration: "Тривалість",
       open: "Детальніше →", broadened: "Точного збігу не знайшлось — показую близькі результати.",
       empty_t: "Нічого не знайшлось.", empty_b: "Спробуй інші слова або послаб фільтри.",
       d_money: "Гроші", d_reqs: "Вимоги до вступу", d_lang: "Мова навчання й вимоги", d_deadlines: "Дедлайни",
       d_about: "Про програму", d_funding: "Фінансування та стипендії", d_support: "Підтримка іноземних студентів",
-      d_semester: "Семестровий внесок", d_living: "Життя на місяць", d_apply: "Куди подаватися",
-      apply_btn: "Портал подачі ↗", official_btn: "Офіційна сторінка ↗",
+      d_semester: "Семестровий внесок", d_living: "Життя на місяць", d_apply: "Куди подаватися й де що шукати",
+      d_housing: "Житло", d_work: "Робота під час навчання", d_org: "Як влаштоване навчання",
+      d_intl: "Міжнародні елементи", d_intern: "Стажування",
+      l_apply: "Подати заявку на програму", l_apply_note: "портал, який указав університет",
+      l_funding: "Фінансова підтримка та стипендії", l_fee: "Семестровий внесок — деталі",
+      l_living: "Вартість життя — деталі", l_reqs: "Вимоги до вступу — деталі",
+      l_lang: "Мовні вимоги та сертифікати", l_housing: "Житло та гуртожитки",
+      l_work: "Робота під час навчання", l_official: "Повний опис програми",
+      l_official_note: "офіційна сторінка, звідки взяті всі факти вище",
       checked: "Дані з офіційного джерела, перевірено", days_left: "через {n} дн.", today: "сьогодні",
       term_winter: "зимовий", term_summer: "літній", term_rolling: "постійно",
       sel_ask: "Запитати AI про це ↗",
@@ -54,15 +62,23 @@
       sort_match: "Best match", sort_tuition: "Lowest tuition", sort_deadline: "Deadline soonest", sort_ielts: "Lowest IELTS",
       footer: "Kounsly — English-taught degrees abroad. Every fact carries its source and the date we checked it.",
       found: "found", of_total: "of", programmes: "programmes",
-      free: "No tuition fees", per_year: "/ year", not_listed: "not listed",
+      free: "No tuition fees", per_year: "/ year", per_semester: "/ semester", not_listed: "not listed",
+      source: "Source:", src_checked: "checked",
       lvl_bachelor: "Bachelor", lvl_master: "Master", lvl_phd: "PhD",
       f_tuition: "Tuition", f_deadline: "Next deadline", f_english: "English", f_duration: "Duration",
       open: "Details →", broadened: "No exact match — showing close results.",
       empty_t: "Nothing matched.", empty_b: "Try different words or loosen the filters.",
       d_money: "Money", d_reqs: "Admission requirements", d_lang: "Teaching language & requirements", d_deadlines: "Deadlines",
       d_about: "About the programme", d_funding: "Funding & scholarships", d_support: "Support for international students",
-      d_semester: "Semester contribution", d_living: "Living cost per month", d_apply: "Where to apply",
-      apply_btn: "Application portal ↗", official_btn: "Official page ↗",
+      d_semester: "Semester contribution", d_living: "Living cost per month", d_apply: "Where to apply and where to look",
+      d_housing: "Accommodation", d_work: "Working while studying", d_org: "How the programme is organised",
+      d_intl: "International elements", d_intern: "Internships",
+      l_apply: "Apply to this programme", l_apply_note: "the portal the university names",
+      l_funding: "Funding and scholarships", l_fee: "Semester contribution — details",
+      l_living: "Cost of living — details", l_reqs: "Admission requirements — details",
+      l_lang: "Language requirements and certificates", l_housing: "Housing and halls of residence",
+      l_work: "Working while studying", l_official: "Full programme description",
+      l_official_note: "the official page every fact above comes from",
       checked: "From the official source, checked", days_left: "in {n} days", today: "today",
       term_winter: "winter", term_summer: "summer", term_rolling: "rolling",
       sel_ask: "Ask AI about this ↗",
@@ -87,10 +103,14 @@
 
   /* ---------- formatting ---------- */
 
-  function money(item) {
-    if (item.tuition_free === 1 || item.tuition_eur_year === 0) return T("free");
+  /** compact = the card, where the label already says "per year" and the figure
+   *  is the thing being looked at. Long form is for the detail tiles. */
+  function money(item, compact) {
+    var free = item.tuition_free === 1 || item.tuition_eur_year === 0;
+    if (free) return compact ? "€0" : T("free");
     if (item.tuition_eur_year == null) return T("not_listed");
-    return "€" + Math.round(item.tuition_eur_year).toLocaleString(lang === "uk" ? "uk-UA" : "en-US") + " " + T("per_year");
+    var n = Math.round(item.tuition_eur_year).toLocaleString(lang === "uk" ? "uk-UA" : "en-US");
+    return compact ? "€" + n : "€" + n + " " + T("per_year");
   }
 
   function nextDeadline(deadlines) {
@@ -214,37 +234,53 @@
     if (pages > 1) list.appendChild(pager(data.page, pages));
   }
 
+  /** Uses the page's original card classes (.top/.uni/.lvl/.facts/.fact/.k/.v/
+   *  .big/.free/.soon/.note/.foot/.src/.lnk) so the typography that made these
+   *  cards look good is the same — only the data behind it is real now. */
   function card(item) {
-    var node = el("button", "card");
-    node.type = "button";
-    node.setAttribute("aria-label", item.name);
+    var node = el("article", "card");
+    node.setAttribute("role", "button");
+    node.setAttribute("tabindex", "0");
     var dl = nextDeadline(item.deadlines);
     var free = item.tuition_free === 1 || item.tuition_eur_year === 0;
+    var cheap = item.tuition_eur_year != null && item.tuition_eur_year > 0 && item.tuition_eur_year <= 3000;
+    var soon = dl && dl.days <= 30;
 
-    var badges = [];
-    badges.push('<span class="badge' + (free ? " money" : "") + '">' + esc(money(item)) + "</span>");
-    if (item.english_only === 1) badges.push('<span class="badge lang">English</span>');
-    if (dl && dl.days <= 30) badges.push('<span class="badge soon">' + esc(daysLabel(dl.days)) + "</span>");
-    if (item.degree_title) badges.push('<span class="badge">' + esc(item.degree_title) + "</span>");
-    if (item.is_online === 1) badges.push('<span class="badge">online</span>');
+    var tuitionNote = free
+      ? (item.semester_fee_raw ? "+ " + shortFee(item.semester_fee_raw) + " " + T("per_semester") : "")
+      : (item.tuition_raw && !/^\s*\d/.test(item.tuition_raw) ? item.tuition_raw.slice(0, 40) : "");
 
     node.innerHTML =
-      '<div class="card-top"><div>' +
-        '<h3 class="card-name">' + esc(item.name) + "</h3>" +
-        '<div class="card-uni">' + esc(item.university) +
-          (item.city ? '<span class="dot">·</span>' + esc(item.city) : "") +
-          '<span class="dot">·</span>' + countryFlag(item.country) + " " + esc(countryName(item.country)) +
-        "</div>" +
-      '</div><span class="card-open">' + esc(T("open")) + "</span></div>" +
-      '<div class="badges">' + badges.join("") + "</div>" +
-      '<div class="card-facts">' +
-        "<div><b>" + esc(T("f_deadline")) + "</b>" + (dl ? esc(dateLabel(dl) + (dl.term ? " · " + termLabel(dl.term) : "")) : esc(T("not_listed"))) + "</div>" +
-        "<div><b>" + esc(T("f_english")) + "</b>" + esc(englishLabel(item)) + "</div>" +
-        "<div><b>" + esc(T("f_duration")) + "</b>" + esc(item.duration_raw || T("not_listed")) + "</div>" +
-      "</div>";
+      '<div class="top"><div>' +
+          "<h3>" + esc(item.name) + "</h3>" +
+          '<div class="uni">' + countryFlag(item.country) + " " + esc(item.university) +
+            (item.city ? " · " + esc(item.city) : "") + "</div>" +
+        "</div><span class=\"lvl\">" + esc(item.degree_title || T("lvl_" + item.degree_level)) + "</span></div>" +
+      '<div class="facts">' +
+        '<div class="fact"><span class="k">' + esc(T("f_tuition")) + "</span>" +
+          '<span class="v big' + (free || cheap ? " free" : "") + '">' + esc(money(item, true)) + "</span>" +
+          (tuitionNote ? '<span class="note">' + esc(tuitionNote) + "</span>" : "") + "</div>" +
+        '<div class="fact"><span class="k">' + esc(T("f_deadline")) + "</span>" +
+          '<span class="v' + (soon ? " soon" : "") + '">' + esc(dl ? dateLabel(dl) : T("not_listed")) + "</span>" +
+          (dl ? '<span class="note">' + esc(soon ? daysLabel(dl.days) : (termLabel(dl.term) || "")) + "</span>" : "") + "</div>" +
+        '<div class="fact"><span class="k">' + esc(T("f_english")) + "</span>" +
+          '<span class="v">' + esc(englishLabel(item)) + "</span></div>" +
+        '<div class="fact"><span class="k">' + esc(T("f_duration")) + "</span>" +
+          '<span class="v">' + esc(item.duration_raw || T("not_listed")) + "</span></div>" +
+      "</div>" +
+      '<div class="foot"><span class="src">' + esc(T("source")) + " " + esc(hostOf(item.source_url)) +
+        " · " + esc(T("src_checked")) + " " + esc(item.checked_at || "") + "</span>" +
+        '<a class="lnk" href="#" onclick="return false">' + esc(T("open")) + "</a></div>";
 
     node.addEventListener("click", function () { openSheet(item.uid); });
+    node.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSheet(item.uid); }
+    });
     return node;
+  }
+
+  function hostOf(url) {
+    try { return new URL(url).hostname.replace(/^www\d?\./, ""); } catch (e) { return ""; }
   }
 
   function pager(page, pages) {
@@ -326,10 +362,7 @@
         '<span class="left">' + esc(one ? daysLabel(one.days) : "") + "</span></div>";
     }).join("");
 
-    var links = '<div class="links">' +
-      (p.application_url ? '<a class="linkbtn apply" href="' + esc(p.application_url) + '" target="_blank" rel="noopener">' + esc(T("apply_btn")) + "</a>" : "") +
-      '<a class="linkbtn" href="' + esc(p.source_url) + '" target="_blank" rel="noopener">' + esc(T("official_btn")) + "</a>" +
-      "</div>";
+    var links = linkList(p);
 
     return '<div class="sheet-head">' +
         '<button class="sheet-close" id="sheet-close" aria-label="Close">✕</button>' +
@@ -345,6 +378,11 @@
         section(T("d_reqs"), p.admission_requirements_raw) +
         section(T("d_lang"), p.language_requirement_raw) +
         section(T("d_funding"), p.scholarships_raw) +
+        section(T("d_org"), p.course_organisation_raw) +
+        section(T("d_intl"), p.international_elements_raw) +
+        section(T("d_intern"), p.internships_raw) +
+        section(T("d_housing"), p.accommodation_raw) +
+        section(T("d_work"), p.part_time_raw) +
         section(T("d_support"), p.support_international) +
         '<div class="sec"><h3>' + esc(T("d_apply")) + "</h3>" +
           (p.application_deadline_raw ? '<div class="txt">' + esc(p.application_deadline_raw) + "</div>" : "") +
@@ -352,6 +390,47 @@
         '<div class="stamp">' + esc(T("checked")) + " " + esc(p.checked_at || "") + "</div>" +
         askHTML() +
       "</div>";
+  }
+
+  /* Which field a link came from is what the link is *for*. Labelling them that
+   * way tells a user "apply here / money here / requirements here" without us
+   * inventing a single word about what is on the other side. */
+  var LINK_SOURCES = [
+    ["application_url", "l_apply", "l_apply_note"],
+    ["scholarships_raw", "l_funding", null],
+    ["semester_fee_raw", "l_fee", null],
+    ["cost_of_living_raw", "l_living", null],
+    ["admission_requirements_raw", "l_reqs", null],
+    ["language_requirement_raw", "l_lang", null],
+    ["accommodation_raw", "l_housing", null],
+    ["part_time_raw", "l_work", null]
+  ];
+  var URL_RE = /https?:\/\/[^\s"'<>)\]]+/g;
+
+  function linkList(p) {
+    var seen = {}, rows = [];
+
+    function add(url, labelKey, noteKey) {
+      url = String(url).replace(/[.,;)]+$/, "");
+      if (!url || seen[url]) return;
+      seen[url] = true;
+      rows.push(
+        '<a class="linkrow" href="' + esc(url) + '" target="_blank" rel="noopener">' +
+          '<span class="lr-what">' + esc(T(labelKey)) +
+            (noteKey ? '<span class="lr-note">' + esc(T(noteKey)) + "</span>" : "") + "</span>" +
+          '<span class="lr-host">' + esc(hostOf(url)) + " ↗</span>" +
+        "</a>");
+    }
+
+    LINK_SOURCES.forEach(function (src) {
+      var value = p[src[0]];
+      if (!value) return;
+      if (src[0] === "application_url") { add(value, src[1], src[2]); return; }
+      (String(value).match(URL_RE) || []).forEach(function (u) { add(u, src[1], src[2]); });
+    });
+    add(p.source_url, "l_official", "l_official_note");
+
+    return '<div class="linklist">' + rows.join("") + "</div>";
   }
 
   /** The semester contribution field is a paragraph; the tile needs the figure. */

@@ -376,6 +376,24 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     })
 
 
+def assistant_available() -> bool:
+    """Whether /api/ask has credentials at all.
+
+    The page asks this before drawing the assistant, so a deploy without
+    credentials looks like a site that simply has no chat box — not like a
+    broken feature that errors when a visitor touches it.
+    """
+    if os.getenv("GEMINI_API_KEY"):
+        return True
+    try:
+        import google.auth
+
+        google.auth.default()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     conn = db()
@@ -383,7 +401,7 @@ def health() -> dict[str, Any]:
         n = conn.execute("SELECT COUNT(*) FROM programs").fetchone()[0]
     finally:
         conn.close()
-    return {"ok": True, "programmes": n, "db": DB_PATH.name}
+    return {"ok": True, "programmes": n, "db": DB_PATH.name, "assistant": assistant_available()}
 
 
 @app.get("/")

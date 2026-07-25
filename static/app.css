@@ -2,49 +2,34 @@
    Everything here reuses --accent/--panel/--brd/--grad etc. so light and dark
    themes keep working without a second palette. */
 
-/* ---------- result cards ---------- */
-.card{
-  position:relative;display:block;width:100%;text-align:left;cursor:pointer;
-  background:var(--panel);border:1px solid var(--brd);border-radius:16px;
-  padding:18px 20px;margin-bottom:12px;color:inherit;font:inherit;
-  transition:border-color .18s ease, transform .18s ease, box-shadow .18s ease;
-}
-.card:hover{border-color:var(--brd-2);transform:translateY(-2px);box-shadow:var(--shadow)}
+/* ---------- result cards ----------
+   The card's own look (typography, .facts grid, the green .free figure, the
+   mono deadline) lives in index.html and is left alone on purpose — only the
+   affordances for "this whole card opens" are added here. */
+.card{cursor:pointer}
+.card:hover{border-color:var(--brd-2)}
 .card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.card-top{display:flex;gap:14px;align-items:flex-start;justify-content:space-between}
-.card-name{font-family:var(--serif);font-size:1.22rem;line-height:1.25;margin:0 0 4px}
-.card-uni{color:var(--muted);font-size:.93rem}
-.card-uni .dot{opacity:.5;margin:0 6px}
-.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.badge{
-  font-size:.76rem;font-weight:600;letter-spacing:.01em;
-  padding:4px 9px;border-radius:999px;border:1px solid var(--brd);
-  background:var(--panel-2);color:var(--muted);white-space:nowrap;
-}
-.badge.money{background:var(--good-soft);border-color:transparent;color:var(--good)}
-.badge.soon{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
-.badge.lang{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
-.card-facts{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px;font-size:.86rem}
-.card-facts b{display:block;color:var(--faint);font-weight:600;font-size:.72rem;
-  text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
-.card-open{color:var(--accent);font-size:.85rem;font-weight:600;white-space:nowrap}
+.card .lnk{pointer-events:none}   /* the whole card is the click target */
 
-/* ---------- detail sheet ---------- */
+/* ---------- detail modal ---------- */
 .sheet-wrap{
   position:fixed;inset:0;z-index:60;display:none;
+  padding:5vh 20px;overflow:auto;
   background:rgba(10,11,17,.55);backdrop-filter:blur(3px);
 }
-.sheet-wrap.open{display:block}
+.sheet-wrap.open{display:flex;align-items:flex-start;justify-content:center}
 .sheet{
-  position:absolute;top:0;right:0;bottom:0;width:min(760px,100%);
-  background:var(--bg);border-left:1px solid var(--brd);
-  overflow-y:auto;overscroll-behavior:contain;
-  animation:slidein .22s cubic-bezier(.2,.7,.3,1);
+  position:relative;width:min(760px,100%);max-height:90vh;
+  display:flex;flex-direction:column;
+  background:var(--bg);border:1px solid var(--brd);border-radius:20px;
+  box-shadow:0 24px 70px rgba(10,11,17,.35);
+  overflow:hidden;
+  animation:popin .2s cubic-bezier(.2,.7,.3,1);
 }
-@keyframes slidein{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes popin{from{transform:translateY(10px) scale(.985);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}}
 .sheet-head{
-  position:sticky;top:0;z-index:2;padding:22px 28px 16px;
+  flex:0 0 auto;padding:24px 28px 16px;
   background:var(--bg);border-bottom:1px solid var(--brd);
 }
 .sheet-close{
@@ -55,7 +40,7 @@
 .sheet-close:hover{color:var(--text);border-color:var(--brd-2)}
 .sheet-title{font-family:var(--serif);font-size:1.7rem;line-height:1.2;margin:0 8px 6px 0;padding-right:40px}
 .sheet-sub{color:var(--muted);font-size:.95rem}
-.sheet-body{padding:22px 28px 120px}
+.sheet-body{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:22px 28px 0}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin:0 0 26px}
 .tile{background:var(--panel);border:1px solid var(--brd);border-radius:13px;padding:13px 15px}
 .tile b{display:block;color:var(--faint);font-size:.7rem;text-transform:uppercase;
@@ -72,14 +57,19 @@
   letter-spacing:.05em;min-width:74px}
 .deadline-row .date{font-weight:600}
 .deadline-row .left{margin-left:auto;font-size:.8rem;color:var(--muted)}
-.links{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
-.linkbtn{
-  display:inline-flex;align-items:center;gap:7px;padding:11px 16px;border-radius:11px;
-  font-size:.9rem;font-weight:600;text-decoration:none;border:1px solid var(--brd);
-  background:var(--panel);color:var(--text);
+/* Labelled links: what you can do, and where it takes you. */
+.linklist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.linkrow{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 15px;border-radius:12px;border:1px solid var(--brd);
+  background:var(--panel);text-decoration:none;color:var(--text);
+  transition:border-color .16s ease, transform .16s ease;
 }
-.linkbtn:hover{border-color:var(--brd-2)}
-.linkbtn.apply{background:var(--grad);border-color:transparent;color:#fff}
+.linkrow:hover{border-color:var(--accent);transform:translateX(2px)}
+.linkrow:first-child{background:var(--accent-soft);border-color:transparent}
+.lr-what{font-size:.93rem;font-weight:650;display:flex;flex-direction:column;gap:2px}
+.lr-note{font-size:.78rem;font-weight:400;color:var(--muted)}
+.lr-host{font-family:var(--mono);font-size:.78rem;color:var(--muted);white-space:nowrap}
 .stamp{margin-top:22px;font-size:.78rem;color:var(--faint)}
 
 /* ---------- selection → ask ---------- */
@@ -94,7 +84,9 @@
 
 /* ---------- assistant ---------- */
 .ask{
-  position:sticky;bottom:0;margin:0 -28px -120px;padding:16px 28px 22px;
+  position:sticky;bottom:0;margin:24px -28px 0;padding:16px 28px 20px;
+  /* --bg, not --panel: in dark theme --panel is translucent white, and content
+     scrolling underneath a sticky bar showed straight through it. */
   background:var(--bg);border-top:1px solid var(--brd);
 }
 .ask-quote{
