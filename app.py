@@ -67,7 +67,7 @@ app.mount("/static", NoStoreStatic(directory=ROOT / "static"), name="static")
 CARD_COLUMNS = [
     "uid", "name", "university", "city", "country", "degree_level", "degree_title",
     "subject", "area", "languages", "english_only", "duration_months", "duration_raw",
-    "start_terms", "is_online", "tuition_free", "tuition_eur_year", "tuition_raw",
+    "ects", "start_terms", "is_online", "tuition_free", "tuition_eur_year", "tuition_raw",
     "semester_fee_raw", "cost_of_living_eur_month", "ielts", "toefl_ibt",
     "english_cefr", "deadlines", "source_url", "application_url", "checked_at",
     "quality",   # used as a tie-breaker in ranking, so it has to come back with the row

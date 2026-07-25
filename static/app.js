@@ -41,6 +41,7 @@
       dl_everyone: "для всіх", dl_non_eu: "для не-ЄС", dl_eu_eea: "для громадян ЄС/ЄЕЗ",
       dl_germany: "для заявників з Німеччини/ЄС", dl_early_bird: "ранній вступ", dl_session: "сесія подачі",
       dl_regular: "звичайний вступ", dl_semester: "семестр",
+      need_school: "атестат про повну середню освіту", need_bachelor: "ступінь бакалавра", need_master: "ступінь магістра",
       g_steps: "Як подаватися", st_reqs: "Перевір вимоги", st_portal: "Зареєструйся на порталі",
       st_deadline: "Подай заявку до", st_money: "Порахуй витрати",
       st_no_portal: "Портал подачі не вказано — шукай кнопку подачі на офіційній сторінці",
@@ -53,7 +54,7 @@
       free: "Без плати за навчання", per_year: "/ рік", per_semester: "/ семестр", not_listed: "не вказано",
       source: "Джерело:", src_checked: "перевірено",
       lvl_bachelor: "Бакалавр", lvl_master: "Магістр", lvl_phd: "PhD",
-      f_tuition: "Плата за навчання", f_deadline: "Найближчий дедлайн", f_english: "Англійська", f_duration: "Тривалість",
+      f_tuition: "Плата за навчання", f_deadline: "Найближчий дедлайн", f_english: "Англійська", f_duration: "Тривалість", f_ects: "Обсяг",
       open: "Детальніше →", broadened: "Точного збігу не знайшлось — показую близькі результати.",
       empty_t: "Нічого не знайшлось.", empty_b: "Спробуй інші слова або послаб фільтри.",
       d_money: "Гроші", d_reqs: "Вимоги до вступу", d_lang: "Мова навчання й вимоги", d_deadlines: "Дедлайни",
@@ -92,6 +93,7 @@
       dl_everyone: "for everyone", dl_non_eu: "for non-EU", dl_eu_eea: "for EU/EEA citizens",
       dl_germany: "for applicants from Germany/EU", dl_early_bird: "early admission", dl_session: "application session",
       dl_regular: "regular admission", dl_semester: "semester",
+      need_school: "school-leaving certificate", need_bachelor: "bachelor's degree", need_master: "master's degree",
       g_steps: "How to apply", st_reqs: "Check the requirements", st_portal: "Register on the portal",
       st_deadline: "Apply by", st_money: "Add up the costs",
       st_no_portal: "No portal stated — look for the apply button on the official page",
@@ -104,7 +106,7 @@
       free: "No tuition fees", per_year: "/ year", per_semester: "/ semester", not_listed: "not listed",
       source: "Source:", src_checked: "checked",
       lvl_bachelor: "Bachelor", lvl_master: "Master", lvl_phd: "PhD",
-      f_tuition: "Tuition", f_deadline: "Next deadline", f_english: "English", f_duration: "Duration",
+      f_tuition: "Tuition", f_deadline: "Next deadline", f_english: "English", f_duration: "Duration", f_ects: "Credits",
       open: "Details →", broadened: "No exact match — showing close results.",
       empty_t: "Nothing matched.", empty_b: "Try different words or loosen the filters.",
       d_money: "Money", d_reqs: "Admission requirements", d_lang: "Teaching language & requirements", d_deadlines: "Deadlines",
@@ -311,8 +313,8 @@
           (dl ? '<span class="note">' + esc(soon ? daysLabel(dl.days) : (termLabel(dl.term) || "")) + "</span>" : "") + "</div>" +
         '<div class="fact"><span class="k">' + esc(T("f_english")) + "</span>" +
           '<span class="v">' + esc(englishLabel(item)) + "</span></div>" +
-        '<div class="fact"><span class="k">' + esc(T("f_duration")) + "</span>" +
-          '<span class="v">' + esc(item.duration_raw || T("not_listed")) + "</span></div>" +
+        '<div class="fact"><span class="k">' + esc(item.duration_raw ? T("f_duration") : T("f_ects")) + "</span>" +
+          '<span class="v">' + esc(item.duration_raw || item.ects || T("not_listed")) + "</span></div>" +
       "</div>" +
       '<div class="foot"><span class="src">' + esc(T("source")) + " " + esc(hostOf(item.source_url)) +
         " · " + esc(T("src_checked")) + " " + esc(item.checked_at || "") + "</span>" +
@@ -457,7 +459,7 @@
       // `wide` drops the label column: for a long prose block the group heading
       // already says what it is, and repeating it wastes a third of the width.
       if (opts.wide) return '<div class="row wide"><div class="row-v">' + linkifyText(value) + "</div></div>";
-      return '<div class="row"><div class="row-k">' + esc(T(labelKey)) + "</div>" +
+      return '<div class="row' + (opts.figure ? " money-row" : "") + '"><div class="row-k">' + esc(T(labelKey)) + "</div>" +
         '<div class="row-v">' + linkifyText(value) + "</div></div>";
     }
     if (!opts.required) return "";
@@ -499,7 +501,8 @@
       '<div class="tile"><b>' + esc(T("d_semester")) + "</b><span>" + esc(p.semester_fee_raw ? shortFee(txt(p, "semester_fee_raw")) : T("not_listed")) + "</span></div>",
       '<div class="tile"><b>' + esc(T("d_living")) + "</b><span>" + (p.cost_of_living_eur_month ? "≈ €" + p.cost_of_living_eur_month : esc(T("not_listed"))) + "</span></div>",
       '<div class="tile"><b>' + esc(T("f_english")) + "</b><span>" + esc(englishLabel(p)) + "</span></div>",
-      '<div class="tile"><b>' + esc(T("f_duration")) + "</b><span>" + esc(p.duration_raw || T("not_listed")) + "</span></div>",
+      '<div class="tile"><b>' + esc(p.duration_raw ? T("f_duration") : T("f_ects")) + "</b><span>" +
+        esc(p.duration_raw || p.ects || T("not_listed")) + "</span></div>",
       '<div class="tile"><b>' + esc(T("f_deadline")) + "</b><span>" + (dl ? esc(dateLabel(dl)) : esc(T("not_listed"))) + "</span></div>"
     ].join("");
 
@@ -539,7 +542,7 @@
           // the missing state with a link instead of a dead end.
           block(p, "f_tuition", null, {
             value: (p.tuition_free === 1 || p.tuition_eur_year != null) ? money(p) : null,
-            required: true
+            required: true, figure: true
           }),
           block(p, "d_semester", "semester_fee_raw", { required: true }),
           block(p, "d_living", "cost_of_living_raw", { required: true }),
@@ -588,7 +591,7 @@
     var steps = [];
 
     var reqs = [];
-    if (p.degree_level && LEVEL_NEEDS[p.degree_level]) reqs.push(T("pr_" + LEVEL_NEEDS[p.degree_level]));
+    if (p.degree_level && LEVEL_NEEDS[p.degree_level]) reqs.push(T("need_" + LEVEL_NEEDS[p.degree_level]));
     if (p.ielts) reqs.push("IELTS " + p.ielts);
     if (p.toefl_ibt) reqs.push("TOEFL " + p.toefl_ibt);
     if (!reqs.length && p.english_cefr) reqs.push(T("f_english") + " " + p.english_cefr);

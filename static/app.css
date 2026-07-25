@@ -211,3 +211,12 @@
    badge is built for "MSc", and a sentence in that field used to widen the whole
    page on a phone. */
 .lvl{max-width:44%;white-space:normal;text-align:right;overflow-wrap:anywhere}
+
+/* Facts look the same inside the modal as on the card that opened it.
+   The card renders values in --mono with tabular numerals (.fact .v in
+   index.html); the modal used the body sans, so opening a programme visibly
+   changed the typeface of the very same figure. Prose stays sans. */
+.tile span{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.deadline-row .date{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.95rem}
+.step-v b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.row.money-row .row-v{font-family:var(--mono);font-variant-numeric:tabular-nums}
