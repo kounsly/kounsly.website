@@ -341,6 +341,13 @@ def service_account_credentials():
     try:
         from google.oauth2 import service_account
 
+        raw = raw.strip()
+        if not raw.startswith("{"):
+            # Also accept base64, which survives pasting into a settings UI that
+            # would otherwise mangle a multi-line JSON blob.
+            import base64
+
+            raw = base64.b64decode(raw).decode("utf-8")
         return service_account.Credentials.from_service_account_info(
             json.loads(raw), scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
@@ -362,6 +369,12 @@ def ask(body: Ask, request: Request) -> JSONResponse:
         conn.close()
     if not row:
         raise HTTPException(404, "no such programme")
+
+    if not assistant_available():
+        # Fail fast and clearly. Falling through would call google.auth.default(),
+        # which blocks on metadata-server discovery for tens of seconds.
+        return JSONResponse({"error": "assistant_unavailable", "detail": "no credentials configured"},
+                            status_code=503)
 
     language = {"uk": "Ukrainian", "en": "English"}.get(body.lang, "English")
     parts = [SYSTEM.format(language=language), "PROGRAMME DATA:", build_context(row_to_dict(row))]
@@ -400,22 +413,23 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     })
 
 
+ADC_FILE = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+
+
 def assistant_available() -> bool:
-    """Whether /api/ask has credentials at all.
+    """Whether /api/ask has credentials at all — decided without any network call.
 
-    The page asks this before drawing the assistant, so a deploy without
-    credentials looks like a site that simply has no chat box — not like a
-    broken feature that errors when a visitor touches it.
+    Never call google.auth.default() here. Off GCP it probes the metadata server
+    at 169.254.169.254 and blocks until that times out, which hung /api/health,
+    failed the container health check, and made Coolify mark the deploy failed
+    while the app itself was fine.
     """
-    if os.getenv("GEMINI_API_KEY") or service_account_credentials():
-        return True
-    try:
-        import google.auth
-
-        google.auth.default()
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+    return bool(
+        os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        or ADC_FILE.exists()
+    )
 
 
 @app.get("/api/health")
