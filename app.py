@@ -291,7 +291,11 @@ def search(
     # A typed phrase becomes filters + a subject to match on meaning. One word is
     # not worth a model call: it is already a good text query on its own.
     interpreted: dict[str, Any] = {}
-    if ai and len(q.split()) >= 2:
+    if ai and q.strip():
+        # Single words go through the parse too: "медицина" needs translating to
+        # "medicine" before it can match an English catalogue, and the call is
+        # cached per phrase, so popular one-word queries cost nothing after the
+        # first visitor.
         interpreted = parse_query(q) or {}
 
     def inferred(key):

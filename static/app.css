@@ -220,3 +220,15 @@
 .deadline-row .date{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.95rem}
 .step-v b{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .row.money-row .row-v{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* The modal heading matches the list. --serif here was a trap: the page's
+   Playfair @font-face covers only the Cyrillic unicode-range, so a Ukrainian
+   heading rendered in Playfair while an English programme name fell back to
+   Georgia — two different typefaces for the same element, neither matching the
+   card the reader had just clicked. */
+.sheet-title{font-family:var(--sans);font-size:1.5rem;font-weight:700;letter-spacing:-.01em}
+
+/* Mono suits figures, not sentences: "Без плати за навчання" set in monospace
+   was the "wrong font" in the tiles. Values with no digits stay in the body face. */
+.tile span.words{font-family:var(--sans);font-variant-numeric:normal;font-weight:600}
+.row.money-row .row-v{font-family:var(--sans)}

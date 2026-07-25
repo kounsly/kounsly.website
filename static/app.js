@@ -496,14 +496,19 @@
     var dl = nextDeadline(p.deadlines);
     var free = p.tuition_free === 1 || p.tuition_eur_year === 0;
 
+    function tile(labelKey, value, extra) {
+      var words = !/\d/.test(String(value));
+      return '<div class="tile' + (extra || "") + '"><b>' + esc(T(labelKey)) + "</b>" +
+        '<span class="' + (words ? "words" : "") + '">' + esc(value) + "</span></div>";
+    }
+
     var tiles = [
-      '<div class="tile' + (free ? " free" : "") + '"><b>' + esc(T("f_tuition")) + "</b><span>" + esc(money(p)) + "</span></div>",
-      '<div class="tile"><b>' + esc(T("d_semester")) + "</b><span>" + esc(p.semester_fee_raw ? shortFee(txt(p, "semester_fee_raw")) : T("not_listed")) + "</span></div>",
-      '<div class="tile"><b>' + esc(T("d_living")) + "</b><span>" + (p.cost_of_living_eur_month ? "≈ €" + p.cost_of_living_eur_month : esc(T("not_listed"))) + "</span></div>",
-      '<div class="tile"><b>' + esc(T("f_english")) + "</b><span>" + esc(englishLabel(p)) + "</span></div>",
-      '<div class="tile"><b>' + esc(p.duration_raw ? T("f_duration") : T("f_ects")) + "</b><span>" +
-        esc(p.duration_raw || p.ects || T("not_listed")) + "</span></div>",
-      '<div class="tile"><b>' + esc(T("f_deadline")) + "</b><span>" + (dl ? esc(dateLabel(dl)) : esc(T("not_listed"))) + "</span></div>"
+      tile("f_tuition", money(p, true), free ? " free" : ""),
+      tile("d_semester", p.semester_fee_raw ? shortFee(txt(p, "semester_fee_raw")) : T("not_listed")),
+      tile("d_living", p.cost_of_living_eur_month ? "≈ €" + p.cost_of_living_eur_month : T("not_listed")),
+      tile("f_english", englishLabel(p)),
+      tile(p.duration_raw ? "f_duration" : "f_ects", p.duration_raw || p.ects || T("not_listed")),
+      tile("f_deadline", dl ? dateLabel(dl) : T("not_listed"))
     ].join("");
 
     // Every date says what kind of deadline it is — regular, early admission, or
