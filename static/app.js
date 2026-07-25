@@ -12,6 +12,75 @@
   var facets = null, current = null, asking = false;
 
   var LEVEL_NEEDS = { bachelor: "school", master: "bachelor", phd: "master" };
+  var EDU_RANK = { school: 1, bachelor: 2, master: 3 };
+
+  /* auth.js runs first (both scripts are deferred, so they run in order), so
+   * this is always there. It answers "is anyone signed in" for the rest of the
+   * file; when accounts are switched off it simply reports nobody. */
+  var A = window.KounslyAuth;
+
+  function profile() {
+    var u = A && A.user();
+    return (u && u.profile) || null;
+  }
+
+  /* Which stated deadline belongs to this reader. Only these three values name
+   * a group of applicants — an early-admission or session date applies to
+   * whoever it applies to and is not about citizenship. */
+  var GROUPED = { non_eu: 1, eu_eea: 1, germany: 1 };
+
+  function myGroup() {
+    var p = profile();
+    if (!p || !p.citizenship) return null;
+    return p.citizenship === "EU" ? "eu_eea" : "non_eu";
+  }
+
+  function isMyDeadline(d) {
+    var mine = myGroup();
+    if (!mine) return false;                       // we don't know, so we don't claim
+    if (!d.applies_to || !GROUPED[d.applies_to]) return true;
+    if (d.applies_to === mine) return true;
+    return mine === "eu_eea" && d.applies_to === "germany";
+  }
+
+  /* Once we know the reader's group, the headline date has to be theirs too.
+   * The tile takes the calendar-nearest date, which for a Ukrainian applicant
+   * was an EU-only deadline — while the list below correctly marked a different
+   * date as theirs. One programme cannot state two different "next deadlines"
+   * to the same person. Falls back to the full set when nothing matches, so a
+   * date is never hidden entirely. */
+  function ownDeadlines(list) {
+    if (!list || !list.length || !myGroup()) return list;
+    var mine = list.filter(isMyDeadline);
+    return mine.length ? mine : list;
+  }
+
+  /* Arithmetic on stated facts, never a prediction: what the page asks for
+   * against what the profile says. Silent whenever either side is unknown —
+   * "we don't know your score" must never render as "you don't qualify". */
+  function eligibility(p) {
+    var me = profile();
+    if (!me) return [];
+    var notes = [];
+
+    if (me.education && LEVEL_NEEDS[p.degree_level]) {
+      var need = LEVEL_NEEDS[p.degree_level];
+      if ((EDU_RANK[me.education] || 0) < EDU_RANK[need]) {
+        notes.push({ ok: false, text: T("el_need").replace("{what}", T("need_" + need)) });
+      }
+    }
+    [["ielts", "el_ielts", p.ielts, 1], ["toefl", "el_toefl", p.toefl_ibt, 0]].forEach(function (t) {
+      var have = parseFloat(me[t[0]]), required = t[2];
+      if (isNaN(have) || required == null) return;
+      var gap = Math.round((required - have) * 10) / 10;
+      if (gap > 0) {
+        notes.push({ ok: false, text: T(t[1]).replace("{req}", required)
+          .replace("{have}", have.toFixed(t[3])).replace("{gap}", gap.toFixed(t[3])) });
+      }
+    });
+
+    return notes;
+  }
 
   /** What kind of deadline this is: regular, early admission, or for a stated
    *  group of applicants — plus the semester it leads to. Descriptive only; the
@@ -75,6 +144,15 @@
       ask_hint: "Відповідає лише за даними цієї програми. Чого немає на офіційній сторінці — так і скаже.",
       ask_wait: "Дивлю дані програми", ask_err: "Асистент недоступний. Спробуй ще раз.",
       ask_limit: "Ліміт безкоштовних питань на годину вичерпано.",
+      ask_month: "Питання на цей місяць вичерпано. Лічильник оновиться 1 числа.",
+      save: "Зберегти", saved: "Збережено", save_aria: "Зберегти програму",
+      watch: "Нагадати про дедлайн", watching: "Нагадаємо про дедлайн",
+      saved_t: "Збережені програми", saved_empty: "Тут поки порожньо — тисни ★ на будь-якій програмі.",
+      back_search: "← До пошуку",
+      my_deadline: "твій дедлайн", el_ok: "вимоги за твоїм профілем виконано",
+      el_need: "потрібен {what}", el_ielts: "IELTS {req} — у тебе {have}, бракує {gap}",
+      el_toefl: "TOEFL {req} — у тебе {have}, бракує {gap}",
+      el_title: "Що каже твій профіль",
       prev: "Назад", next: "Далі", page_of: "стор. {p} з {t}", langbtn: "UA"
     },
     en: {
@@ -127,6 +205,15 @@
       ask_hint: "Answers only from this programme's data. If the official page doesn't say, it will tell you so.",
       ask_wait: "Reading the programme data", ask_err: "Assistant unavailable. Try again.",
       ask_limit: "Hourly limit of free questions reached.",
+      ask_month: "You've used this month's questions. The counter resets on the 1st.",
+      save: "Save", saved: "Saved", save_aria: "Save this programme",
+      watch: "Remind me about the deadline", watching: "Reminder on",
+      saved_t: "Saved programmes", saved_empty: "Nothing here yet — hit ★ on any programme.",
+      back_search: "← Back to search",
+      my_deadline: "your deadline", el_ok: "your profile meets the stated requirements",
+      el_need: "{what} required", el_ielts: "IELTS {req} — you have {have}, {gap} short",
+      el_toefl: "TOEFL {req} — you have {have}, {gap} short",
+      el_title: "What your profile says",
       prev: "Back", next: "Next", page_of: "page {p} of {t}", langbtn: "EN"
     }
   };
@@ -320,6 +407,39 @@
     if (pages > 1) list.appendChild(pager(data.page, pages));
   }
 
+  /* The saved list is the same list, from a different source: the cards, the
+   * modal and the assistant all behave identically, so nothing here is a second
+   * implementation of the results view. */
+  function showSaved() {
+    var list = $("list"), uids = A.savedUids();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    function frame(inner) {
+      list.innerHTML = "";
+      var bar = el("div", "savedbar");
+      bar.appendChild(el("h2", null, T("saved_t")));
+      var back = el("button", null, T("back_search"));
+      back.onclick = function () { state.page = 1; runSearch(); };
+      bar.appendChild(back);
+      list.appendChild(bar);
+      inner.forEach(function (n) { list.appendChild(n); });
+    }
+
+    $("count").textContent = uids.length + " " + T("programmes");
+    if (!uids.length) {
+      var box = el("div", "empty");
+      box.appendChild(el("p", null, T("saved_empty")));
+      frame([box]);
+      return;
+    }
+
+    list.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+    fetch("/api/programs?uids=" + encodeURIComponent(uids.join(",")))
+      .then(function (r) { return r.json(); })
+      .then(function (d) { frame((d.items || []).map(card)); })
+      .catch(function () { frame([el("div", "empty", T("ask_err"))]); });
+  }
+
   /** Uses the page's original card classes (.top/.uni/.lvl/.facts/.fact/.k/.v/
    *  .big/.free/.soon/.note/.foot/.src/.lnk) so the typography that made these
    *  cards look good is the same — only the data behind it is real now. */
@@ -327,7 +447,7 @@
     var node = el("article", "card");
     node.setAttribute("role", "button");
     node.setAttribute("tabindex", "0");
-    var dl = nextDeadline(item.deadlines);
+    var dl = nextDeadline(ownDeadlines(item.deadlines));
     var free = item.tuition_free === 1 || item.tuition_eur_year === 0;
     var cheap = item.tuition_eur_year != null && item.tuition_eur_year > 0 && item.tuition_eur_year <= 3000;
     var soon = dl && dl.days <= 30;
@@ -337,6 +457,7 @@
       : (item.tuition_raw && !/^\s*\d/.test(item.tuition_raw) ? item.tuition_raw.slice(0, 40) : "");
 
     node.innerHTML =
+      saveStar(item.uid) +
       '<div class="top"><div>' +
           "<h3>" + esc(item.name) + "</h3>" +
           '<div class="uni">' + countryFlag(item.country) + " " + esc(item.university) +
@@ -363,6 +484,83 @@
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSheet(item.uid); }
     });
     return node;
+  }
+
+  /* ---------- saving ----------
+   *
+   * The star is on the card for signed-out visitors too, and it fills in when
+   * they press it. Starring is the moment worth an account, so it has to be
+   * offered before there is one — the programme is held locally and the sign-in
+   * box opens behind an already-filled star. Refusing the click and showing a
+   * login form instead turns an offer into a toll gate.
+   */
+
+  function saveStar(uid) {
+    if (!A || !A.enabled) return "";
+    var on = A.isSaved(uid);
+    return '<button class="save' + (on ? " on" : "") + '" data-uid="' + esc(uid) + '"' +
+      ' aria-label="' + esc(T("save_aria")) + '" aria-pressed="' + (on ? "true" : "false") + '">' +
+      (on ? "★" : "☆") + "</button>";
+  }
+
+  function actsHTML(p) {
+    if (!A || !A.enabled) return "";
+    var saved = A.isSaved(p.uid), watched = A.isWatched(p.uid);
+    return '<div class="sheet-acts">' +
+      '<button class="sheet-act' + (saved ? " on" : "") + '" data-act="save" data-uid="' + esc(p.uid) + '">' +
+        "<span>" + (saved ? "★" : "☆") + "</span>" + esc(T(saved ? "saved" : "save")) + "</button>" +
+      // Only once there is a sender behind it. Offering to e-mail someone before
+      // a deadline, and then not doing it, costs more than never offering.
+      (A.reminders()
+        ? '<button class="sheet-act' + (watched ? " on" : "") + '" data-act="watch" data-uid="' + esc(p.uid) + '">' +
+            "<span>◷</span>" + esc(T(watched ? "watching" : "watch")) + "</button>"
+        : "") +
+    "</div>";
+  }
+
+  /* Clicks are handled once, at the document, in the capture phase. Capture
+   * because the whole card is a click target that opens the detail sheet, and a
+   * bubble-phase handler on the star would run after it — pressing save would
+   * also open the programme. */
+  document.addEventListener("click", function (e) {
+    if (!A || !A.enabled || !e.target.closest) return;
+
+    var star = e.target.closest(".save[data-uid]");
+    if (star) {
+      e.preventDefault();
+      e.stopPropagation();
+      A.toggleSaved(star.getAttribute("data-uid"));
+      return;
+    }
+    var act = e.target.closest(".sheet-act[data-act]");
+    if (act) {
+      e.preventDefault();
+      var uid = act.getAttribute("data-uid");
+      if (act.getAttribute("data-act") === "save") A.toggleSaved(uid);
+      else A.toggleWatched(uid);
+    }
+  }, true);
+
+  /** Repaint only what depends on the account. Deliberately not a re-search:
+   *  starring a programme must not reshuffle the list under the reader's hand. */
+  function syncAuthUI() {
+    if (!A) return;
+    document.querySelectorAll(".save[data-uid]").forEach(function (b) {
+      var on = A.isSaved(b.getAttribute("data-uid"));
+      b.classList.toggle("on", on);
+      b.textContent = on ? "★" : "☆";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    var acts = document.querySelector(".sheet-acts");
+    if (acts && current) acts.outerHTML = actsHTML(current);
+    var left = document.getElementById("ask-left");
+    if (left) paintQuota(left);
+  }
+
+  function paintQuota(node) {
+    var q = A && A.quota();
+    node.textContent = A ? A.quotaLabel() : "";
+    node.classList.toggle("low", !!(q && q.remaining != null && q.remaining <= 1));
   }
 
   /** The badge is sized for "MSc". Some sources put a sentence in that field
@@ -439,6 +637,7 @@
     if (wrap) wrap.classList.remove("open");
     hidePop();
     current = null;
+    if (A) A.currentUid = null;
     document.body.style.overflow = "";
   }
 
@@ -515,6 +714,10 @@
 
   function openSheet(uid) {
     var n = sheetNodes();
+    // Remembered for the round trip to Google or Apple: signing in is a full
+    // page load, and coming back to a blank home page loses the very programme
+    // they were signing in to save.
+    if (A) A.currentUid = uid;
     n.wrap.classList.add("open");
     document.body.style.overflow = "hidden";
     n.sheet.innerHTML = '<div class="sheet-body"><div class="skeleton"></div><div class="skeleton"></div></div>';
@@ -531,7 +734,7 @@
   }
 
   function sheetHTML(p) {
-    var dl = nextDeadline(p.deadlines);
+    var dl = nextDeadline(ownDeadlines(p.deadlines));
     var free = p.tuition_free === 1 || p.tuition_eur_year === 0;
 
     function tile(labelKey, value, extra) {
@@ -551,15 +754,21 @@
 
     // Every date says what kind of deadline it is — regular, early admission, or
     // for a particular group of applicants. Three unexplained dates read as a
-    // bug; the source distinguished them all along. Which one is *yours* waits
-    // for accounts.
+    // bug; the source distinguished them all along. Now that there is an account
+    // behind it, the one that is *theirs* is marked — and only when the profile
+    // actually says which group they are in. Unknown stays unmarked rather than
+    // guessing: telling someone the wrong date costs them a year.
     var deadlineRows = (p.deadlines || []).map(function (d) {
       var one = nextDeadline([d]);
-      return '<div class="deadline-row">' +
+      var mine = isMyDeadline(d);
+      return '<div class="deadline-row' + (mine ? " mine" : "") + '">' +
         '<span class="date">' + esc(dateLabel(d)) + "</span>" +
-        '<span class="who">' + esc(deadlineKind(d)) + "</span>" +
+        '<span class="who">' + esc(deadlineKind(d)) +
+          (mine ? " · " + esc(T("my_deadline")) : "") + "</span>" +
         '<span class="left">' + esc(one ? daysLabel(one.days) : "") + "</span></div>";
     }).join("");
+
+    var gaps = eligibility(p);
 
     var links = linkList(p);
 
@@ -579,6 +788,19 @@
       "</div>" +
       '<div class="sheet-body">' +
         '<div class="grid">' + tiles + "</div>" +
+        actsHTML(p) +
+
+        // Comparison, not a verdict: the numbers the page states against the
+        // numbers the reader gave us. Shown only when both exist, and only ever
+        // as a gap — whether they are admitted is the university's to say.
+        (gaps.length
+          ? '<div class="grp"><h3>' + esc(T("el_title")) + "</h3>" +
+              gaps.map(function (g) {
+                return '<div class="step missing"><span class="step-n">!</span>' +
+                  '<div class="step-b"><div class="step-v">' + esc(g.text) + "</div></div></div>";
+              }).join("") +
+            "</div>"
+          : "") +
 
         group("g_money", [
           // Pass null rather than the "not listed" string, so an unknown fee gets
@@ -748,7 +970,8 @@
         '<input id="ask-input" type="text" autocomplete="off" placeholder="' + esc(T("ask_ph")) + '">' +
         '<button type="submit">' + esc(T("ask_send")) + "</button>" +
       "</form>" +
-      '<div class="ask-hint">' + esc(T("ask_hint")) + "</div>" +
+      '<div class="ask-hint">' + esc(T("ask_hint")) +
+        ' <span class="ask-left" id="ask-left"></span></div>' +
       "</div>";
   }
 
@@ -758,36 +981,66 @@
     var form = $("ask-form"), input = $("ask-input"), thread = $("thread");
     selection = null;
     renderQuote();
+    var left = $("ask-left");
+    if (left) paintQuota(left);
 
-    form.onsubmit = function (e) {
-      e.preventDefault();
-      var question = input.value.trim();
-      if (!question || asking) return;
-      input.value = "";
+    function send(question, quoted) {
       asking = true;
-
       thread.appendChild(el("div", "msg me", question));
       var wait = el("div", "msg ai dots", T("ask_wait"));
       thread.appendChild(wait);
       wait.scrollIntoView({ block: "nearest" });
 
-      fetch("/api/ask", {
+      var body = { uid: p.uid, question: question, selection: quoted, lang: lang };
+      if (A) body.anon_id = A.anonId();
+
+      // Through auth.fetch so the token rides along when there is one: the same
+      // question is metered against the account rather than the device.
+      return (A ? A.fetch : fetch)("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uid: p.uid, question: question, selection: selection, lang: lang })
+        body: JSON.stringify(body)
       })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
         .then(function (res) {
           wait.remove();
           if (res.status === 429) { thread.appendChild(el("div", "msg ai err", T("ask_limit"))); return; }
+
+          // Out of questions. For a signed-out reader that is an offer, and the
+          // wall asks the question they had already typed once there is an
+          // account — losing it would make signing in feel like a punishment.
+          // For someone already signed in there is nothing to offer yet, so say
+          // so plainly rather than showing them a login box they don't need.
+          if (res.status === 402 && A) {
+            if (A.signedIn()) {
+              thread.appendChild(el("div", "msg ai err", T("ask_month")));
+              return;
+            }
+            thread.lastChild.remove();          // take the unanswered question back
+            A.openGate("ask", function () { send(question, quoted); });
+            return;
+          }
           if (!res.ok || !res.d.answer) { thread.appendChild(el("div", "msg ai err", T("ask_err"))); return; }
+
+          if (res.d.quota && A) A.setQuota(res.d.quota);
           var answer = el("div", "msg ai");
           answer.innerHTML = linkify(res.d.answer);
           thread.appendChild(answer);
           answer.scrollIntoView({ block: "nearest" });
         })
         .catch(function () { wait.remove(); thread.appendChild(el("div", "msg ai err", T("ask_err"))); })
-        .finally(function () { asking = false; selection = null; renderQuote(); });
+        .finally(function () { asking = false; });
+    }
+
+    form.onsubmit = function (e) {
+      e.preventDefault();
+      var question = input.value.trim();
+      if (!question || asking) return;
+      var quoted = selection;
+      input.value = "";
+      selection = null;
+      renderQuote();
+      send(question, quoted);
     };
   }
 
@@ -932,6 +1185,7 @@
       lang = lang === "uk" ? "en" : "uk";
       localStorage.setItem("kounsly.lang", lang);
       applyI18n(); buildSelects();
+      if (A) A.refresh();          // the header and the sign-in box are translated too
       if (current) openSheet(current.uid);
       runSearch();
     });
@@ -942,8 +1196,21 @@
   applyI18n();
   bind();
   bindTheme();
-  fetch("/api/facets")
-    .then(function (r) { return r.json(); })
-    .then(function (f) { facets = f; buildSelects(); runSearch(); })
-    .catch(function () { runSearch(); });
+  if (A) A.onShowSaved = showSaved;
+
+  /* Both requests are local and go out together, so waiting for the account
+   * before the first render costs nothing — and it means cards are drawn with
+   * their stars already in the right state rather than visibly filling in a
+   * moment later. */
+  Promise.all([
+    A ? A.init(syncAuthUI) : Promise.resolve(null),
+    fetch("/api/facets").then(function (r) { return r.json(); }).catch(function () { return null; })
+  ]).then(function (both) {
+    facets = both[1];
+    if (facets) buildSelects();
+    runSearch();
+    // Back from Google or Apple: reopen what they were reading.
+    var resume = A && A.resumeUid();
+    if (resume) openSheet(resume);
+  });
 })();

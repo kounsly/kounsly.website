@@ -3,3 +3,8 @@ fastapi==0.140.0
 uvicorn[standard]==0.51.0
 google-genai==2.14.0
 numpy==2.5.1
+# Accounts. pyjwt verifies Supabase's access tokens (ES256 on current projects,
+# so the crypto extra is not optional); psycopg holds the user data.
+pyjwt[crypto]==2.13.0
+psycopg[binary]==3.3.4
+psycopg-pool==3.3.1

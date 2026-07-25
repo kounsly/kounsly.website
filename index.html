@@ -179,6 +179,9 @@
     <div class="sp"></div>
     <button class="iconbtn" id="langbtn">EN</button>
     <button class="iconbtn" id="themebtn" aria-label="Theme">☾</button>
+    <!-- Filled by auth.js: "Sign in", or the account menu. Empty and invisible
+         when accounts are not configured, so the header is unchanged. -->
+    <div id="authslot"></div>
   </div>
 </header>
 
@@ -230,6 +233,9 @@
 
 <footer class="foot"><div class="wrap" data-i18n="footer"></div></footer>
 
+<!-- auth.js first: app.js calls into window.KounslyAuth as it boots, and both
+     are deferred, so they run in document order. -->
+<script src="/static/auth.js" defer></script>
 <script src="/static/app.js" defer></script>
 </body>
 </html>

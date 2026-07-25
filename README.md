@@ -31,17 +31,25 @@ that: 78 MB is past what GitHub takes without complaint, and every deploy left
 another copy of it on a 20 GB disk. Code and data now ship separately — `git
 push` for one, `build_db.py --publish-remote` for the other.
 
-**There is no build step.** One `index.html`, one JavaScript file, one
+**There is no build step.** One `index.html`, two JavaScript files, one
 stylesheet, no framework, no bundler, no npm. Not minimalism for its own sake:
 a change is visible the moment it is saved, and there is no toolchain to break
 between writing a fix and shipping it.
 
+User data — accounts, saved lists, search history, the profile — is the one
+thing that must be writable, so it lives in a *separate* Postgres and never
+touches the catalogue. See [SETUP-AUTH.md](SETUP-AUTH.md); it is switched off
+until configured.
+
 ## Layout
 
 ```
-app.py            FastAPI: search, facets, one programme, the assistant
+app.py            FastAPI: search, facets, one programme, the assistant, accounts
+auth.py           Token verification, the user store, the question quota
+schema.sql        The user tables — run once against Supabase, not shipped
 index.html        The whole page. Design tokens and the card styles live here
 static/app.js     Search, results, the detail sheet, the assistant
+static/auth.js    Sign-in, the wall, onboarding — talks to Supabase directly
 static/app.css    Components layered on index.html's tokens
 kounsly.db        The catalogue — gitignored; the pipeline writes it here
 ```
@@ -67,7 +75,8 @@ with `python build_db.py --publish-only`, which copies it here.
 
 Search and the detail view work with no credentials. The assistant needs Vertex
 access (`gcloud auth application-default login`) and degrades to plain text
-search without it rather than failing.
+search without it rather than failing. Accounts stay off until the Supabase
+variables are set.
 
 ## Environment
 
@@ -82,6 +91,8 @@ search without it rather than failing.
 | `KOUNSLY_EMBED_MODEL` | `gemini-embedding-2` | 768 dimensions, must match the pipeline |
 | `KOUNSLY_ASK_LIMIT` | `20` | Questions per hour per IP — abuse control, not a plan |
 
+Account-related variables are in [SETUP-AUTH.md](SETUP-AUTH.md).
+
 ## API
 
 | | |
@@ -89,8 +100,11 @@ search without it rather than failing.
 | `GET /api/search` | The main one. `q`, filters, `sort`, `page`, `ai=false` to skip interpretation |
 | `GET /api/facets` | Counts for the filter dropdowns |
 | `GET /api/program/{uid}` | Every stored field for one programme |
+| `GET /api/programs?uids=a,b` | Card rows for an explicit set — how a saved list renders |
 | `POST /api/ask` | The grounded assistant |
-| `GET /api/health` | Row count, and whether the assistant is configured |
+| `GET /api/config` | What the browser needs before it knows who is looking |
+| `GET/PUT /api/me`, `/api/saved`, `/api/watch`, `/api/history` | Accounts |
+| `GET /api/health` | Row count, and whether the assistant and accounts are configured |
 
 ## How search actually works
 
@@ -156,7 +170,7 @@ and `translate.py` restores them from cache *without* the repairs.
   off GCP blocks on the metadata server at 169.254.169.254 until it times out.
   That hung `/api/health`, failed the container check, and made Coolify report a
   perfectly healthy deploy as failed. `assistant_available()` decides from
-  environment variables only.
+  environment variables only, and `accounts_available()` follows the same rule.
 - **The page and its scripts are served `no-store`.** A deploy once shipped new
   markup against last week's JavaScript, which looks like a broken feature
   rather than a stale file, and cost hours. Switch to hashed filenames when
@@ -177,13 +191,7 @@ and `translate.py` restores them from cache *without* the repairs.
 
 ## Not built yet
 
-Accounts, saved lists and deadline reminders are written and waiting on the
-`accounts` branch — sign-in through Supabase with Google, Apple and e-mail
-codes, plus the profile that decides which stated deadline is the reader's. It
-is unmerged because it needs a Supabase project configured first; see
-`SETUP-AUTH.md` on that branch.
-
-Also missing: payments, the reminder sender, and SEO pages for individual
-programmes. The site is one URL with no router, so nothing is bookmarkable or
-shareable yet — that is the same change as SEO pages, and probably the
-highest-value one left.
+Payments (`plan` is a column nothing sets to `pro`), the deadline-reminder
+sender, account deletion, and SEO pages for individual programmes. The site is
+one URL with no router, so nothing is bookmarkable or shareable yet — that is
+the same change as SEO pages, and probably the highest-value one left.

@@ -27,6 +27,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import auth
+
 ROOT = Path(__file__).resolve().parent
 # In production this is a read-only bind mount from the host (/data/kounsly),
 # because the catalogue outgrew being committed to git. Locally it is the file
@@ -531,7 +533,9 @@ class Ask(BaseModel):
     question: str = Field(max_length=600)
     selection: Optional[str] = Field(None, max_length=2000)
     lang: str = "uk"
-    profile: Optional[Profile] = None
+    # Sent by a signed-out visitor so their free questions follow the device
+    # rather than the IP — a shared university network is one IP.
+    anon_id: Optional[str] = Field(None, max_length=64)
 
 
 SYSTEM = """You are Kounsly's admissions assistant. You answer about ONE study programme,
@@ -687,6 +691,14 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     if rate_limited(ip):
         return JSONResponse({"error": "rate_limited", "limit_per_hour": ASK_LIMIT_PER_HOUR}, status_code=429)
 
+    # Two different ceilings, and they answer different questions. The one above
+    # is abuse control and has always been by IP. This one is the plan: how many
+    # answers this reader gets before signing in or upgrading buys them more.
+    user = auth.current_user(request)
+    allowance = auth.quota(user, (body.anon_id or "")[:64])
+    if not allowance["allowed"]:
+        return JSONResponse({"error": "quota", **allowance}, status_code=402)
+
     conn = db()
     try:
         row = conn.execute("SELECT * FROM programs WHERE uid = ?", (body.uid,)).fetchone()
@@ -704,10 +716,11 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     language = {"uk": "Ukrainian", "en": "English"}.get(body.lang, "English")
     parts = [SYSTEM.format(language=language), "PROGRAMME DATA:",
              build_context(row_to_dict(row), body.lang)]
-    if body.profile:
-        told = {k: v for k, v in body.profile.model_dump().items() if v}
-        if told:
-            parts.append("READER PROFILE: " + ", ".join(f"{k}={v}" for k, v in told.items()))
+    # The profile is read from the account, never from the request body: what
+    # the assistant is told about a person has to be what that person saved
+    # about themselves, not what a caller claims.
+    if told := auth.profile_of(user):
+        parts.append("READER PROFILE: " + ", ".join(f"{k}={v}" for k, v in told.items()))
     if body.selection:
         parts.append(f'The user highlighted this text on the page:\n"""{body.selection}"""')
     parts.append(f"USER QUESTION: {body.question}")
@@ -733,14 +746,160 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     except Exception as e:  # noqa: BLE001 — surface a usable message, never a stack trace
         return JSONResponse({"error": "assistant_unavailable", "detail": str(e)[:200]}, status_code=503)
 
+    # Counted only now: a call that failed on our side is not one of the
+    # reader's questions.
+    auth.record_ask(user, (body.anon_id or "")[:64], body.uid)
+
     usage = getattr(resp, "usage_metadata", None)
     return JSONResponse({
         "answer": answer or "Не змогла сформувати відповідь. Спробуй перефразувати питання.",
+        # Sent back so the page can show "2 questions left" before the reader
+        # hits the wall instead of at it.
+        "quota": {**allowance, "used": allowance["used"] + 1,
+                  "remaining": None if allowance["remaining"] is None else max(0, allowance["remaining"] - 1)},
         "tokens": {
             "in": getattr(usage, "prompt_token_count", 0) or 0,
             "out": getattr(usage, "candidates_token_count", 0) or 0,
         },
     })
+
+
+# ---------- accounts ----------
+#
+# The wall is deliberately late. Search, the full card and the first questions
+# need no account, because a visitor who has not seen the catalogue has no
+# reason to give us an address. What does need one is anything we would have to
+# keep: a saved list, a deadline we promise to remind them about, and a profile
+# that lets the page say "your date" instead of "a date".
+
+
+class ProfileIn(BaseModel):
+    citizenship: Optional[str] = None
+    status: Optional[str] = None
+    education: Optional[str] = None
+    ielts: Optional[float] = Field(None, ge=0, le=9)
+    toefl: Optional[int] = Field(None, ge=0, le=120)
+    lang: Optional[str] = None
+
+
+class UidsIn(BaseModel):
+    uids: list[str] = Field(default_factory=list, max_length=200)
+
+
+def signed_in(request: Request) -> dict[str, Any]:
+    user = auth.current_user(request)
+    if not user:
+        raise HTTPException(401, "sign in required")
+    return user
+
+
+def me_payload(user: dict[str, Any], request: Request) -> dict[str, Any]:
+    return {
+        "user": {
+            "id": str(user["id"]),
+            "email": user.get("email"),
+            "plan": user.get("plan", "free"),
+            "onboarded": bool(user.get("onboarded")),
+            "profile": {f: user.get(f) for f in auth.PROFILE_FIELDS},
+        },
+        "saved": auth.saved_uids(user["id"]),
+        "watched": auth.watched_uids(user["id"]),
+        "quota": auth.quota(user, ""),
+    }
+
+
+@app.get("/api/config")
+def config(anon_id: str = "") -> dict[str, Any]:
+    """What the page needs before it knows who is looking at it.
+
+    Includes the anonymous allowance so the assistant can show "1 question left"
+    on the first visit rather than only discovering the limit by hitting it.
+    """
+    out = auth.public_config()
+    out["quota"] = auth.quota(None, anon_id[:64]) if anon_id else None
+    return out
+
+
+@app.get("/api/me")
+def me(request: Request) -> dict[str, Any]:
+    return me_payload(signed_in(request), request)
+
+
+@app.put("/api/me")
+def save_profile(body: ProfileIn, request: Request) -> dict[str, Any]:
+    user = signed_in(request)
+    updated = auth.update_profile(user["id"], body.model_dump(exclude_unset=True))
+    return me_payload(updated, request)
+
+
+def add_to_list(kind: str, body: UidsIn, request: Request) -> dict[str, Any]:
+    """Save programmes or watch their deadlines.
+
+    Takes a list rather than one uid because this is also how a visitor's
+    pre-sign-in shortlist arrives: they starred three programmes, then signed
+    in, and all three land in one call. Losing that list at the moment of
+    signing in is the fastest way to make an account feel like a toll gate.
+    """
+    user = signed_in(request)
+    auth.add_many(kind, user["id"], body.uids)
+    return me_payload(user, request)
+
+
+def remove_from_list(kind: str, uid: str, request: Request) -> dict[str, Any]:
+    user = signed_in(request)
+    auth.remove(kind, user["id"], uid)
+    return me_payload(user, request)
+
+
+# Spelled out rather than one /api/{kind} route: a path parameter here would
+# quietly swallow every future POST under /api/ that happens not to be a list.
+@app.post("/api/saved")
+def add_saved(body: UidsIn, request: Request) -> dict[str, Any]:
+    return add_to_list("saved", body, request)
+
+
+@app.delete("/api/saved/{uid}")
+def remove_saved(uid: str, request: Request) -> dict[str, Any]:
+    return remove_from_list("saved", uid, request)
+
+
+@app.post("/api/watch")
+def add_watch(body: UidsIn, request: Request) -> dict[str, Any]:
+    return add_to_list("watch", body, request)
+
+
+@app.delete("/api/watch/{uid}")
+def remove_watch(uid: str, request: Request) -> dict[str, Any]:
+    return remove_from_list("watch", uid, request)
+
+
+@app.get("/api/programs")
+def programs_by_uid(uids: str = "") -> dict[str, Any]:
+    """Card rows for an explicit set of uids — how a saved list is rendered.
+
+    A uid that is no longer in the catalogue is simply absent from the result
+    rather than an error: sources drop programmes, and that must not break a
+    page listing the other four.
+    """
+    wanted = [u for u in uids.split(",") if u.strip()][:200]
+    if not wanted:
+        return {"items": []}
+    today_mmdd = date.today().month * 100 + date.today().day
+    placeholders = ",".join("?" * len(wanted))
+    conn = db()
+    try:
+        rows = conn.execute(
+            f"""SELECT {CARD_FIELDS},
+                       (SELECT MIN((d.mmdd - ? + 10000) % 10000)
+                          FROM program_deadlines d WHERE d.uid = p.uid) AS next_deadline
+                FROM programs p WHERE p.uid IN ({placeholders})""",
+            (today_mmdd, *wanted),
+        ).fetchall()
+    finally:
+        conn.close()
+    # Returned in the order asked for, which is the order they were saved in.
+    by_uid = {r["uid"]: row_to_dict(r) for r in rows}
+    return {"items": [by_uid[u] for u in wanted if u in by_uid]}
 
 
 ADC_FILE = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
@@ -769,7 +928,8 @@ def health() -> dict[str, Any]:
         n = conn.execute("SELECT COUNT(*) FROM programs").fetchone()[0]
     finally:
         conn.close()
-    return {"ok": True, "programmes": n, "db": DB_PATH.name, "assistant": assistant_available()}
+    return {"ok": True, "programmes": n, "db": DB_PATH.name,
+            "assistant": assistant_available(), "accounts": auth.accounts_available()}
 
 
 @app.get("/")

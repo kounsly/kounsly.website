@@ -232,3 +232,179 @@
    was the "wrong font" in the tiles. Values with no digits stay in the body face. */
 .tile span.words{font-family:var(--sans);font-variant-numeric:normal;font-weight:600}
 .row.money-row .row-v{font-family:var(--sans)}
+
+/* ---------- accounts ----------
+   The sign-in dialog is deliberately quieter than the detail sheet: it is an
+   interruption, and an interruption that shouts reads as a toll gate. Same
+   tokens, smaller box, no gradient except on the one button that commits. */
+
+.gate-wrap{
+  position:fixed;inset:0;z-index:90;display:none;
+  padding:6vh 20px;overflow:auto;
+  background:rgba(10,11,17,.6);backdrop-filter:blur(4px);
+}
+.gate-wrap.open{display:flex;align-items:flex-start;justify-content:center}
+.gate{
+  position:relative;width:min(420px,100%);
+  background:var(--bg);border:1px solid var(--brd);border-radius:20px;
+  box-shadow:0 24px 70px rgba(10,11,17,.4);padding:30px 28px 22px;
+  animation:popin .2s cubic-bezier(.2,.7,.3,1);
+}
+@media (prefers-reduced-motion:reduce){.gate{animation:none}}
+.gate.onboard{width:min(500px,100%)}
+.gate h2{font-family:var(--sans);font-size:1.28rem;font-weight:700;letter-spacing:-.01em;
+  line-height:1.25;margin:0 34px 8px 0}
+.gate-lede{margin:0 0 20px;font-size:.92rem;line-height:1.55;color:var(--muted)}
+.gate-close{
+  position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:10px;
+  border:1px solid var(--brd);background:var(--panel);color:var(--muted);
+  font-size:1rem;line-height:1;cursor:pointer;
+}
+.gate-close:hover{color:var(--text);border-color:var(--brd-2)}
+
+.gate-choices{display:flex;flex-direction:column;gap:9px}
+.gate-btn{
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:13px 16px;border-radius:12px;border:1px solid var(--brd-2);
+  background:var(--panel);color:var(--text);font:inherit;font-size:.93rem;font-weight:600;
+  cursor:pointer;transition:border-color .16s ease,background .16s ease;
+}
+.gate-btn:hover{border-color:var(--accent)}
+.gate-btn .gi{display:flex;width:18px;justify-content:center;flex:0 0 18px}
+.gate-btn.g-email .gi{color:var(--muted);font-size:1.05rem}
+
+.gate-form{display:flex;gap:9px;margin-top:4px}
+.gate-form input{
+  flex:1;min-width:0;padding:12px 14px;border-radius:11px;border:1px solid var(--brd-2);
+  background:var(--panel);color:var(--text);font:inherit;font-size:.93rem;
+}
+.gate-form input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.gate-form button{
+  padding:12px 17px;border-radius:11px;border:0;background:var(--grad);color:#fff;
+  font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;
+}
+.gate-form button:disabled{opacity:.5;cursor:default}
+/* A six-digit code is a figure, and figures are mono everywhere else here. */
+#gate-code-in{font-family:var(--mono);font-size:1.15rem;letter-spacing:.24em;text-align:center}
+.gate-sent{margin:0 0 10px;font-size:.88rem;color:var(--muted)}
+.gate-err{margin-top:9px;font-size:.84rem;color:var(--warn);min-height:1.1em}
+.gate-back{
+  margin-top:6px;border:0;background:none;color:var(--muted);
+  font:inherit;font-size:.83rem;text-decoration:underline;cursor:pointer;padding:0;
+}
+.gate-back:hover{color:var(--text)}
+.gate-legal{margin:18px 0 0;font-size:.74rem;line-height:1.5;color:var(--faint)}
+
+/* ---------- onboarding ---------- */
+.ob-row{margin:0 0 16px}
+.ob-row > b{display:block;font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--faint);font-weight:700;margin-bottom:7px}
+.ob-opts{display:flex;flex-wrap:wrap;gap:7px}
+.ob-opt{
+  padding:8px 14px;border-radius:999px;border:1px solid var(--brd-2);
+  background:var(--panel);color:var(--text);font:inherit;font-size:.86rem;font-weight:600;cursor:pointer;
+}
+.ob-opt:hover{border-color:var(--accent)}
+.ob-opt.on{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
+.ob-tests{display:flex;gap:9px}
+.ob-tests input{
+  width:110px;padding:10px 13px;border-radius:11px;border:1px solid var(--brd-2);
+  background:var(--panel);color:var(--text);font:inherit;font-size:.9rem;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+}
+.ob-tests input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+/* Shown only when protected status is chosen: the one answer we refuse to act on. */
+.ob-note{
+  margin:0 0 16px;padding:11px 13px;border-left:3px solid var(--warn);
+  background:var(--panel-2);border-radius:0 8px 8px 0;font-size:.82rem;line-height:1.5;color:var(--muted);
+}
+.ob-actions{display:flex;align-items:center;gap:12px;margin-top:20px}
+.ob-actions .ob-save{
+  margin-left:auto;padding:12px 24px;border-radius:11px;border:0;background:var(--grad);
+  color:#fff;font:inherit;font-weight:600;cursor:pointer;
+}
+.ob-actions .ob-skip{
+  border:0;background:none;color:var(--muted);font:inherit;font-size:.88rem;
+  text-decoration:underline;cursor:pointer;padding:0;
+}
+.ob-actions .ob-skip:hover{color:var(--text)}
+
+/* ---------- header ---------- */
+.signin{
+  padding:8px 15px;border-radius:10px;border:1px solid var(--brd-2);
+  background:var(--panel);color:var(--text);font:inherit;font-size:.86rem;font-weight:600;cursor:pointer;
+}
+.signin:hover{border-color:var(--accent)}
+.acct{position:relative}
+.acct-btn{width:34px;height:34px;border-radius:50%;border:0;background:var(--grad);
+  color:#fff;font:inherit;font-weight:700;cursor:pointer;padding:0}
+.acct-i{font-size:.9rem;line-height:1}
+.acct-menu{
+  position:absolute;right:0;top:calc(100% + 8px);z-index:70;min-width:200px;
+  display:flex;flex-direction:column;padding:6px;
+  background:var(--bg);border:1px solid var(--brd);border-radius:13px;box-shadow:var(--shadow);
+}
+.acct-menu[hidden]{display:none}
+.acct-email{padding:8px 10px 9px;font-size:.78rem;color:var(--faint);
+  border-bottom:1px solid var(--brd);margin-bottom:5px;overflow-wrap:anywhere}
+.acct-menu button{
+  text-align:left;padding:9px 10px;border-radius:9px;border:0;background:none;
+  color:var(--text);font:inherit;font-size:.88rem;cursor:pointer;
+}
+.acct-menu button:hover{background:var(--panel-2)}
+
+/* ---------- save / watch ----------
+   The star sits on the card, not behind a menu: it is the first thing worth an
+   account, so it has to be visible before anyone has one. */
+.save{
+  position:absolute;top:14px;right:14px;z-index:2;
+  width:32px;height:32px;border-radius:9px;border:1px solid transparent;
+  background:none;color:var(--faint);font-size:1.05rem;line-height:1;cursor:pointer;
+  opacity:0;transition:opacity .16s ease,color .16s ease;
+}
+.card{position:relative}
+.card:hover .save,.card:focus-within .save,.save.on{opacity:1}
+.save:hover{color:var(--accent);border-color:var(--brd)}
+.save.on{color:var(--accent)}
+@media (hover:none){.save{opacity:1}}   /* no hover on a phone: always visible */
+
+/* In the detail sheet the two actions are stated in words — this is where the
+   reader decides, and an unlabelled icon is not a decision. */
+.sheet-acts{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 22px}
+.sheet-act{
+  display:flex;align-items:center;gap:7px;padding:10px 15px;border-radius:11px;
+  border:1px solid var(--brd-2);background:var(--panel);color:var(--text);
+  font:inherit;font-size:.88rem;font-weight:600;cursor:pointer;
+}
+.sheet-act:hover{border-color:var(--accent)}
+.sheet-act.on{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
+
+/* The reader's own deadline, once the profile says which group they are in.
+   The others stay fully visible: knowing your date is useful, being shown only
+   your date is a claim we can't stand behind if the profile is wrong. */
+.deadline-row.mine{background:var(--accent-soft);border-radius:9px;padding:7px 10px;border-bottom:0}
+.deadline-row.mine .date{color:var(--accent-ink)}
+.deadline-row.mine .who{color:var(--accent-ink);font-weight:600}
+
+/* The remaining allowance, next to the hint that already explains the
+   assistant. Shown before the wall, never only at it. */
+.ask-left{color:var(--muted);font-weight:600}
+.ask-left.low{color:var(--warn)}
+
+/* Saved view: same list, different source. */
+.savedbar{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.savedbar h2{font-family:var(--sans);font-size:1.05rem;font-weight:700;margin:0}
+.savedbar button{
+  margin-left:auto;border:0;background:none;color:var(--muted);
+  font:inherit;font-size:.84rem;text-decoration:underline;cursor:pointer;
+}
+.savedbar button:hover{color:var(--text)}
+
+@media (max-width:700px){
+  .gate-wrap{padding:0;align-items:stretch}
+  .gate{width:100%;border-radius:0;border:0;min-height:100dvh;padding:26px 18px 24px;animation:none}
+  .gate-form{flex-direction:column}
+  .gate-form input{font-size:1rem}          /* 16px stops iOS zooming the page in */
+  .gate-form button{width:100%}
+  .ob-tests input{flex:1;width:auto}
+}

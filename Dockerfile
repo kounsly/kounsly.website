@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py index.html ./
+COPY app.py auth.py index.html ./
 COPY static ./static
 
 # The catalogue is NOT in the image any more. It used to be, and that was the
