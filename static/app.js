@@ -132,7 +132,45 @@
   };
   function T(k) { return (STR[lang] && STR[lang][k]) || k; }
 
-  var COUNTRY = { DE: { uk: "Німеччина", en: "Germany", flag: "🇩🇪" }, FI: { uk: "Фінляндія", en: "Finland", flag: "🇫🇮" } };
+  /* Filled in ahead of the connectors. A country arriving in the data without
+   * an entry here renders as a bare code — "SE" with no flag and no Ukrainian
+   * name — so the map covers Europe now rather than needing a front-end change
+   * every time a source comes online. */
+  var COUNTRY = {
+    DE: { uk: "Німеччина", en: "Germany", flag: "🇩🇪" },
+    FI: { uk: "Фінляндія", en: "Finland", flag: "🇫🇮" },
+    SE: { uk: "Швеція", en: "Sweden", flag: "🇸🇪" },
+    NO: { uk: "Норвегія", en: "Norway", flag: "🇳🇴" },
+    DK: { uk: "Данія", en: "Denmark", flag: "🇩🇰" },
+    IS: { uk: "Ісландія", en: "Iceland", flag: "🇮🇸" },
+    NL: { uk: "Нідерланди", en: "Netherlands", flag: "🇳🇱" },
+    BE: { uk: "Бельгія", en: "Belgium", flag: "🇧🇪" },
+    LU: { uk: "Люксембург", en: "Luxembourg", flag: "🇱🇺" },
+    IE: { uk: "Ірландія", en: "Ireland", flag: "🇮🇪" },
+    FR: { uk: "Франція", en: "France", flag: "🇫🇷" },
+    ES: { uk: "Іспанія", en: "Spain", flag: "🇪🇸" },
+    PT: { uk: "Португалія", en: "Portugal", flag: "🇵🇹" },
+    IT: { uk: "Італія", en: "Italy", flag: "🇮🇹" },
+    AT: { uk: "Австрія", en: "Austria", flag: "🇦🇹" },
+    CH: { uk: "Швейцарія", en: "Switzerland", flag: "🇨🇭" },
+    PL: { uk: "Польща", en: "Poland", flag: "🇵🇱" },
+    CZ: { uk: "Чехія", en: "Czechia", flag: "🇨🇿" },
+    SK: { uk: "Словаччина", en: "Slovakia", flag: "🇸🇰" },
+    HU: { uk: "Угорщина", en: "Hungary", flag: "🇭🇺" },
+    SI: { uk: "Словенія", en: "Slovenia", flag: "🇸🇮" },
+    HR: { uk: "Хорватія", en: "Croatia", flag: "🇭🇷" },
+    RO: { uk: "Румунія", en: "Romania", flag: "🇷🇴" },
+    BG: { uk: "Болгарія", en: "Bulgaria", flag: "🇧🇬" },
+    GR: { uk: "Греція", en: "Greece", flag: "🇬🇷" },
+    CY: { uk: "Кіпр", en: "Cyprus", flag: "🇨🇾" },
+    MT: { uk: "Мальта", en: "Malta", flag: "🇲🇹" },
+    EE: { uk: "Естонія", en: "Estonia", flag: "🇪🇪" },
+    LV: { uk: "Латвія", en: "Latvia", flag: "🇱🇻" },
+    LT: { uk: "Литва", en: "Lithuania", flag: "🇱🇹" },
+    GB: { uk: "Велика Британія", en: "United Kingdom", flag: "🇬🇧" },
+    RS: { uk: "Сербія", en: "Serbia", flag: "🇷🇸" },
+    TR: { uk: "Туреччина", en: "Türkiye", flag: "🇹🇷" }
+  };
   function countryName(code) { var c = COUNTRY[code]; return c ? c[lang] || c.en : code; }
   function countryFlag(code) { return (COUNTRY[code] || {}).flag || ""; }
   var MONTHS = { uk: ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"],
