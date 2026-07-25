@@ -8,7 +8,7 @@
   "use strict";
 
   var lang = localStorage.getItem("kounsly.lang") || "uk";
-  var state = { q: "", country: "", area: "", subject: "", level: "", budget: "", free: false, sort: "match", page: 1 };
+  var state = { q: "", country: "", area: "", subject: "", level: "", budget: "", free: false, sort: "match", page: 1, ai: true };
   var facets = null, current = null, asking = false;
 
   var STR = {
@@ -24,6 +24,11 @@
       sort_match: "За релевантністю", sort_tuition: "Найдешевші", sort_deadline: "Дедлайн найближче", sort_ielts: "Найнижчий IELTS",
       footer: "Kounsly — підбір англомовних програм за кордоном. Кожен факт має джерело й дату перевірки.",
       found: "знайдено", of_total: "з", programmes: "програм",
+      read_as: "Зрозуміла так:", read_off: "шукати дослівно",
+      g_money: "Гроші", g_admission: "Вимоги до вступу", g_deadlines: "Дедлайни й подача",
+      g_about: "Про програму", g_life: "Життя та побут", g_extras: "Що ще вказано на сторінці",
+      d_deadline_text: "Як указано на сторінці",
+      no_data: "Немає даних на офіційній сторінці.", no_data_ask: "уточнити тут ↗",
       free: "Без плати за навчання", per_year: "/ рік", per_semester: "/ семестр", not_listed: "не вказано",
       source: "Джерело:", src_checked: "перевірено",
       lvl_bachelor: "Бакалавр", lvl_master: "Магістр", lvl_phd: "PhD",
@@ -62,6 +67,11 @@
       sort_match: "Best match", sort_tuition: "Lowest tuition", sort_deadline: "Deadline soonest", sort_ielts: "Lowest IELTS",
       footer: "Kounsly — English-taught degrees abroad. Every fact carries its source and the date we checked it.",
       found: "found", of_total: "of", programmes: "programmes",
+      read_as: "Read as:", read_off: "search literally",
+      g_money: "Money", g_admission: "Admission requirements", g_deadlines: "Deadlines and applying",
+      g_about: "About the programme", g_life: "Life and living", g_extras: "Also stated on the page",
+      d_deadline_text: "As stated on the page",
+      no_data: "The official page does not state this.", no_data_ask: "check here ↗",
       free: "No tuition fees", per_year: "/ year", per_semester: "/ semester", not_listed: "not listed",
       source: "Source:", src_checked: "checked",
       lvl_bachelor: "Bachelor", lvl_master: "Master", lvl_phd: "PhD",
@@ -192,6 +202,7 @@
     if (state.budget === "0") p.set("free_only", "true");
     else if (state.budget) p.set("max_tuition", state.budget);
     if (state.free) p.set("free_only", "true");
+    if (state.ai === false) p.set("ai", "false");
     p.set("sort", state.sort);
     p.set("page", state.page);
     return p.toString();
@@ -220,6 +231,8 @@
     $("count").textContent = data.total.toLocaleString(lang === "uk" ? "uk-UA" : "en-US") + " " + T("programmes");
 
     if (data.broadened) list.appendChild(el("div", "broadened", T("broadened")));
+    var read = interpretation(data);
+    if (read) list.appendChild(read);
     if (!data.items.length) {
       var box = el("div", "empty");
       box.appendChild(el("h3", null, T("empty_t")));
@@ -283,6 +296,31 @@
     try { return new URL(url).hostname.replace(/^www\d?\./, ""); } catch (e) { return ""; }
   }
 
+  /** Show what the model made of the phrase, and let the user throw it away.
+   *  An inferred filter that silently hides results is worse than no filter. */
+  function interpretation(data) {
+    var i = data.interpreted || {};
+    var chips = [];
+    if (i.subject) chips.push(i.subject);
+    if (i.level) chips.push(T("lvl_" + i.level));
+    if (i.country) chips.push(countryFlag(i.country) + " " + countryName(i.country));
+    if (i.free_only) chips.push(T("free"));
+    if (i.max_tuition_eur_year) chips.push("≤ €" + Math.round(i.max_tuition_eur_year));
+    if (i.max_ielts) chips.push("IELTS ≤ " + i.max_ielts);
+    if (!chips.length) return null;
+
+    var box = el("div", "read");
+    box.innerHTML = '<span class="read-k">' + esc(T("read_as")) + "</span>" +
+      chips.map(function (c) { return '<span class="read-chip">' + esc(c) + "</span>"; }).join("") +
+      '<button class="read-off" type="button">' + esc(T("read_off")) + "</button>";
+    box.querySelector(".read-off").onclick = function () {
+      state.ai = false;
+      state.page = 1;
+      runSearch();
+    };
+    return box;
+  }
+
   function pager(page, pages) {
     var box = el("div", "pager");
     var prev = el("button", null, T("prev")), next = el("button", null, T("next"));
@@ -320,9 +358,60 @@
     document.body.style.overflow = "";
   }
 
+  /* Ukrainian versions of the prose fields are pre-translated into the database.
+   * Fall back to the source language only when a translation is missing, so the
+   * page is never half in a language the reader did not choose. */
+  var UK_FIELD = {
+    description: "description_uk",
+    admission_requirements_raw: "admission_requirements_uk",
+    language_requirement_raw: "language_requirement_uk",
+    scholarships_raw: "scholarships_uk",
+    semester_fee_raw: "semester_fee_uk",
+    cost_of_living_raw: "cost_of_living_uk",
+    course_organisation_raw: "course_organisation_uk",
+    international_elements_raw: "international_elements_uk",
+    internships_raw: "internships_uk",
+    accommodation_raw: "accommodation_uk",
+    part_time_raw: "part_time_raw_uk",
+    support_international: "support_international_uk",
+    application_deadline_raw: "application_deadline_uk"
+  };
+
+  function txt(p, field) {
+    if (lang === "uk" && UK_FIELD[field] && p[UK_FIELD[field]]) return p[UK_FIELD[field]];
+    return p[field];
+  }
+
   function section(title, text) {
     if (!text) return "";
     return '<div class="sec"><h3>' + esc(title) + '</h3><div class="txt">' + esc(text) + "</div></div>";
+  }
+
+  /* One template for every programme. A field the source does not state is shown
+   * as missing with somewhere to go, rather than quietly omitted — "we don't
+   * know" and "it doesn't apply" are different answers to a person deciding
+   * where to spend two years. Optional fields are omitted when empty. */
+  function block(p, labelKey, field, opts) {
+    opts = opts || {};
+    var value = opts.value !== undefined ? opts.value : txt(p, field);
+    if (value) {
+      // `wide` drops the label column: for a long prose block the group heading
+      // already says what it is, and repeating it wastes a third of the width.
+      if (opts.wide) return '<div class="row wide"><div class="row-v">' + esc(value) + "</div></div>";
+      return '<div class="row"><div class="row-k">' + esc(T(labelKey)) + "</div>" +
+        '<div class="row-v">' + esc(value) + "</div></div>";
+    }
+    if (!opts.required) return "";
+    var where = p.application_url || p.source_url;
+    return '<div class="row missing"><div class="row-k">' + esc(T(labelKey)) + "</div>" +
+      '<div class="row-v">' + esc(T("no_data")) +
+        (where ? ' <a href="' + esc(where) + '" target="_blank" rel="noopener">' + esc(T("no_data_ask")) + "</a>" : "") +
+      "</div></div>";
+  }
+
+  function group(titleKey, rows) {
+    var body = rows.filter(Boolean).join("");
+    return body ? '<div class="grp"><h3>' + esc(T(titleKey)) + "</h3>" + body + "</div>" : "";
   }
 
   function openSheet(uid) {
@@ -348,7 +437,7 @@
 
     var tiles = [
       '<div class="tile' + (free ? " free" : "") + '"><b>' + esc(T("f_tuition")) + "</b><span>" + esc(money(p)) + "</span></div>",
-      '<div class="tile"><b>' + esc(T("d_semester")) + "</b><span>" + esc(p.semester_fee_raw ? shortFee(p.semester_fee_raw) : T("not_listed")) + "</span></div>",
+      '<div class="tile"><b>' + esc(T("d_semester")) + "</b><span>" + esc(p.semester_fee_raw ? shortFee(txt(p, "semester_fee_raw")) : T("not_listed")) + "</span></div>",
       '<div class="tile"><b>' + esc(T("d_living")) + "</b><span>" + (p.cost_of_living_eur_month ? "≈ €" + p.cost_of_living_eur_month : esc(T("not_listed"))) + "</span></div>",
       '<div class="tile"><b>' + esc(T("f_english")) + "</b><span>" + esc(englishLabel(p)) + "</span></div>",
       '<div class="tile"><b>' + esc(T("f_duration")) + "</b><span>" + esc(p.duration_raw || T("not_listed")) + "</span></div>",
@@ -364,6 +453,13 @@
 
     var links = linkList(p);
 
+    var extras = (p.extras && typeof p.extras === "object")
+      ? Object.keys(p.extras).map(function (k) {
+          return '<div class="row"><div class="row-k">' + esc(k) + "</div>" +
+                 '<div class="row-v">' + esc(p.extras[k]) + "</div></div>";
+        }).join("")
+      : "";
+
     return '<div class="sheet-head">' +
         '<button class="sheet-close" id="sheet-close" aria-label="Close">✕</button>' +
         '<h2 class="sheet-title">' + esc(p.name) + "</h2>" +
@@ -373,20 +469,47 @@
       "</div>" +
       '<div class="sheet-body">' +
         '<div class="grid">' + tiles + "</div>" +
-        (deadlineRows ? '<div class="sec"><h3>' + esc(T("d_deadlines")) + "</h3>" + deadlineRows + "</div>" : "") +
-        section(T("d_about"), p.description) +
-        section(T("d_reqs"), p.admission_requirements_raw) +
-        section(T("d_lang"), p.language_requirement_raw) +
-        section(T("d_funding"), p.scholarships_raw) +
-        section(T("d_org"), p.course_organisation_raw) +
-        section(T("d_intl"), p.international_elements_raw) +
-        section(T("d_intern"), p.internships_raw) +
-        section(T("d_housing"), p.accommodation_raw) +
-        section(T("d_work"), p.part_time_raw) +
-        section(T("d_support"), p.support_international) +
-        '<div class="sec"><h3>' + esc(T("d_apply")) + "</h3>" +
-          (p.application_deadline_raw ? '<div class="txt">' + esc(p.application_deadline_raw) + "</div>" : "") +
-          links + "</div>" +
+
+        group("g_money", [
+          // Pass null rather than the "not listed" string, so an unknown fee gets
+          // the missing state with a link instead of a dead end.
+          block(p, "f_tuition", null, {
+            value: (p.tuition_free === 1 || p.tuition_eur_year != null) ? money(p) : null,
+            required: true
+          }),
+          block(p, "d_semester", "semester_fee_raw", { required: true }),
+          block(p, "d_living", "cost_of_living_raw", { required: true }),
+          block(p, "d_funding", "scholarships_raw", { required: true })
+        ]) +
+
+        group("g_admission", [
+          block(p, "d_reqs", "admission_requirements_raw", { required: true }),
+          block(p, "d_lang", "language_requirement_raw", { required: true })
+        ]) +
+
+        group("g_deadlines", [
+          deadlineRows
+            ? '<div class="row"><div class="row-k">' + esc(T("d_deadlines")) + '</div><div class="row-v">' + deadlineRows + "</div></div>"
+            : "",
+          block(p, "d_deadline_text", "application_deadline_raw", { required: !deadlineRows })
+        ]) +
+
+        group("g_about", [
+          block(p, "d_about", "description", { required: true, wide: true }),
+          block(p, "d_org", "course_organisation_raw"),
+          block(p, "d_intl", "international_elements_raw"),
+          block(p, "d_intern", "internships_raw")
+        ]) +
+
+        group("g_life", [
+          block(p, "d_housing", "accommodation_raw"),
+          block(p, "d_work", "part_time_raw"),
+          block(p, "d_support", "support_international")
+        ]) +
+
+        (extras ? '<div class="grp"><h3>' + esc(T("g_extras")) + "</h3>" + extras + "</div>" : "") +
+
+        '<div class="grp"><h3>' + esc(T("d_apply")) + "</h3>" + links + "</div>" +
         '<div class="stamp">' + esc(T("checked")) + " " + esc(p.checked_at || "") + "</div>" +
         askHTML() +
       "</div>";
@@ -408,12 +531,18 @@
   var URL_RE = /https?:\/\/[^\s"'<>)\]]+/g;
 
   function linkList(p) {
-    var seen = {}, rows = [];
+    var seen = {}, perPurpose = {}, rows = [];
 
     function add(url, labelKey, noteKey) {
       url = String(url).replace(/[.,;)]+$/, "");
-      if (!url || seen[url]) return;
-      seen[url] = true;
+      if (!url) return;
+      // Three links all labelled "housing" is noise, not thoroughness: one entry
+      // per purpose+host, and at most two per purpose.
+      var hostKey = labelKey + "@" + hostOf(url);
+      if (seen[url] || seen[hostKey]) return;
+      perPurpose[labelKey] = (perPurpose[labelKey] || 0) + 1;
+      if (perPurpose[labelKey] > 2) return;
+      seen[url] = seen[hostKey] = true;
       rows.push(
         '<a class="linkrow" href="' + esc(url) + '" target="_blank" rel="noopener">' +
           '<span class="lr-what">' + esc(T(labelKey)) +
@@ -600,13 +729,13 @@
   var debounce;
   function onQuery() {
     clearTimeout(debounce);
-    debounce = setTimeout(function () { state.q = $("q").value.trim(); state.page = 1; runSearch(); }, 320);
+    debounce = setTimeout(function () { state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); }, 320);
   }
 
   function bind() {
     $("q").addEventListener("input", onQuery);
-    $("go").addEventListener("click", function () { state.q = $("q").value.trim(); state.page = 1; runSearch(); });
-    $("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { state.q = $("q").value.trim(); state.page = 1; runSearch(); } });
+    $("go").addEventListener("click", function () { state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); });
+    $("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); } });
 
     [["f-region", "country"], ["f-country", "area"], ["f-field", "subject"], ["f-level", "level"], ["f-budget", "budget"], ["f-sort", "sort"]]
       .forEach(function (pair) {
@@ -615,7 +744,7 @@
 
     $("f-free").addEventListener("change", function () { state.free = this.checked; state.page = 1; runSearch(); });
     $("reset").addEventListener("click", function () {
-      state = { q: "", country: "", area: "", subject: "", level: "", budget: "", free: false, sort: "match", page: 1 };
+      state = { q: "", country: "", area: "", subject: "", level: "", budget: "", free: false, sort: "match", page: 1, ai: true };
       $("q").value = ""; $("f-free").checked = false;
       buildSelects(); runSearch();
     });

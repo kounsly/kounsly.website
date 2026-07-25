@@ -127,11 +127,62 @@
 .pager button:disabled{opacity:.4;cursor:default}
 .pager span{color:var(--muted);font-size:.88rem}
 .broadened{font-size:.85rem;color:var(--warn);margin-bottom:10px}
+
+/* How the phrase was understood — visible, and dismissible. */
+.read{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 14px}
+.read-k{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600}
+.read-chip{
+  font-size:.82rem;font-weight:600;padding:4px 10px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent-ink);
+}
+.read-off{
+  margin-left:2px;border:0;background:none;color:var(--muted);
+  font:inherit;font-size:.8rem;text-decoration:underline;cursor:pointer;
+}
+.read-off:hover{color:var(--text)}
 .skeleton{height:118px;border-radius:16px;background:var(--panel-2);margin-bottom:12px;
   animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.55}50%{opacity:.9}}
-@media (max-width:640px){
-  .sheet-head,.sheet-body{padding-left:18px;padding-right:18px}
-  .ask{margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px}
-  .sheet-title{font-size:1.4rem}
+/* ---------- template rows ---------- */
+.grp{margin:0 0 26px}
+.grp h3{
+  font-size:.74rem;text-transform:uppercase;letter-spacing:.09em;color:var(--accent-ink);
+  font-weight:700;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--brd);
 }
+.row{display:grid;grid-template-columns:170px 1fr;gap:14px;padding:9px 0}
+.row + .row{border-top:1px dashed var(--brd)}
+.row-k{font-size:.82rem;color:var(--faint);font-weight:600;line-height:1.5}
+.row-v{font-size:.94rem;line-height:1.62;white-space:pre-line;min-width:0;overflow-wrap:anywhere}
+.row.missing .row-v{color:var(--muted);font-style:italic;white-space:normal}
+.row.missing a{color:var(--accent);font-style:normal;white-space:nowrap}
+.row-v .deadline-row:first-child{padding-top:0}
+
+/* ---------- mobile ---------- */
+@media (max-width:700px){
+  .sheet-wrap{padding:0;overflow:hidden}
+  .sheet-wrap.open{align-items:stretch}
+  .sheet{
+    width:100%;max-width:none;max-height:100dvh;height:100dvh;
+    border-radius:0;border:0;animation:none;
+  }
+  .sheet-head{padding:16px 16px 12px}
+  .sheet-title{font-size:1.25rem;padding-right:44px}
+  .sheet-sub{font-size:.85rem}
+  .sheet-close{top:12px;right:12px}
+  .sheet-body{padding:16px 16px 0}
+  .ask{margin:20px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+  .ask-form input{font-size:1rem}          /* 16px stops iOS zooming the page in */
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .tile{padding:11px 12px}
+  .tile span{font-size:.95rem}
+  /* Label above value: a 170px label column leaves nothing for the text. */
+  .row{grid-template-columns:1fr;gap:3px;padding:11px 0}
+  .row-k{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
+  /* Long portal hostnames were running off the screen. */
+  .linkrow{flex-direction:column;align-items:flex-start;gap:6px}
+  .lr-host{font-size:.72rem;overflow-wrap:anywhere;white-space:normal}
+  .deadline-row{flex-wrap:wrap}
+  .deadline-row .left{margin-left:0;width:100%}
+}
+
+.row.wide{grid-template-columns:1fr}

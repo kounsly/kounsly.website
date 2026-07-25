@@ -50,8 +50,13 @@ CARD_COLUMNS = [
     "start_terms", "is_online", "tuition_free", "tuition_eur_year", "tuition_raw",
     "semester_fee_raw", "cost_of_living_eur_month", "ielts", "toefl_ibt",
     "english_cefr", "deadlines", "source_url", "application_url", "checked_at",
+    "quality",   # used as a tie-breaker in ranking, so it has to come back with the row
 ]
 CARD_FIELDS = ", ".join(f"p.{c}" for c in CARD_COLUMNS)
+
+EMBED_MODEL = os.getenv("KOUNSLY_EMBED_MODEL", "gemini-embedding-2")
+PARSE_MODEL = os.getenv("KOUNSLY_PARSE_MODEL", "gemini-3.5-flash-lite")
+EMBED_DIM = 768
 
 SORTS = {
     # "Best match" with no search text is really "show your best records first":
@@ -72,9 +77,12 @@ def db() -> sqlite3.Connection:
 
 def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     out = dict(row)
-    for key in ("languages", "deadlines"):
+    for key in ("languages", "deadlines", "extras"):
         if isinstance(out.get(key), str):
-            out[key] = json.loads(out[key])
+            try:
+                out[key] = json.loads(out[key])
+            except json.JSONDecodeError:
+                out[key] = None
     return out
 
 
@@ -101,6 +109,147 @@ def fts_terms(raw: str) -> list[str]:
     return [f'"{w}"*' for w in words[:8]]
 
 
+"""--------------- semantic layer ---------------
+
+Two AI touches on a search, both small and both cached:
+
+1. The phrase a person types is turned into filters ("cheap master's in ML in
+   Germany" -> level=master, country=DE, tuition ceiling) plus the part that is
+   really about *subject matter*. Fast model, and identical queries are answered
+   from memory.
+2. That subject part is embedded and compared against the catalogue's vectors,
+   so a programme matches on meaning rather than on sharing tokens.
+
+Filters the user set by hand always win over anything the model inferred — the
+dropdowns are an instruction, the sentence is a guess.
+"""
+
+_vectors: Any = None          # numpy matrix, L2-normalised rows
+_vector_uids: list[str] = []
+_vector_pos: dict[str, int] = {}
+_parse_cache: dict[str, dict] = {}
+_query_vec_cache: dict[str, Any] = {}
+
+
+def load_vectors() -> None:
+    global _vectors, _vector_uids, _vector_pos
+    if _vectors is not None:
+        return
+    try:
+        import numpy as np
+    except ImportError:
+        print("numpy missing — semantic search disabled, text search unaffected")
+        _vectors = False
+        return
+
+    conn = db()
+    try:
+        rows = conn.execute("SELECT uid, vec FROM program_vectors").fetchall()
+    except sqlite3.OperationalError:
+        rows = []          # database built before vectors existed
+    finally:
+        conn.close()
+
+    if not rows:
+        _vectors = False
+        return
+
+    matrix = np.frombuffer(b"".join(r["vec"] for r in rows), dtype="<f4").reshape(len(rows), EMBED_DIM)
+    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+    _vectors = matrix / np.maximum(norms, 1e-9)
+    _vector_uids = [r["uid"] for r in rows]
+    _vector_pos = {uid: i for i, uid in enumerate(_vector_uids)}
+    print(f"semantic search ready: {len(rows)} vectors x {EMBED_DIM}")
+
+
+class ParsedQuery(BaseModel):
+    subject: Optional[str] = Field(
+        None, description="Only the field of study / topic, in English, 1-6 words. "
+        "Null if the query names no subject.")
+    level: Optional[str] = Field(None, description="bachelor, master or phd if stated; else null")
+    country: Optional[str] = Field(None, description="ISO-3166 alpha-2 if a country is named; else null")
+    free_only: Optional[bool] = Field(None, description="true only if they ask for free / no tuition")
+    max_tuition_eur_year: Optional[float] = Field(
+        None, description="A stated budget ceiling per year in EUR. Null unless a number is given.")
+    max_ielts: Optional[float] = Field(
+        None, description="Set only when they ask for a low or no English-test requirement, e.g. 6.0. Else null.")
+
+
+PARSE_PROMPT = """Turn a study-abroad search phrase into filters. The user may write in
+Ukrainian, English or a mix.
+
+RULES
+- Extract only what the phrase actually says. Do not invent a country, level or budget.
+- `subject` is the topic only, translated to English, with no filter words: from
+  "дешевий магістр з машинного навчання в Німеччині" -> subject "machine learning".
+- "дешевий"/"cheap" alone is not a number: leave max_tuition_eur_year null and do not
+  set free_only unless they say free / без плати / no tuition / безкоштовно.
+- "без високого IELTS", "низький IELTS", "without IELTS" -> max_ielts 6.0.
+
+PHRASE: {q}"""
+
+
+def parse_query(q: str) -> dict[str, Any]:
+    """Model-extracted filters, or {} when the assistant has no credentials."""
+    key = q.strip().lower()
+    if key in _parse_cache:
+        return _parse_cache[key]
+    if not assistant_available():
+        return {}
+
+    try:
+        from google.genai import types
+
+        resp = gemini_client().models.generate_content(
+            model=PARSE_MODEL,
+            contents=PARSE_PROMPT.format(q=q[:400]),
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=ParsedQuery,
+                temperature=0,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
+        parsed = resp.parsed.model_dump() if resp.parsed else {}
+    except Exception as e:  # noqa: BLE001 — a failed parse degrades to plain text search
+        print(f"query parse failed: {str(e)[:160]}")
+        parsed = {}
+
+    if len(_parse_cache) > 2000:
+        _parse_cache.clear()
+    _parse_cache[key] = parsed
+    return parsed
+
+
+def query_vector(text: str):
+    """Embedding of the subject part of a query, cached per string."""
+    key = text.strip().lower()
+    if key in _query_vec_cache:
+        return _query_vec_cache[key]
+    if _vectors is False or not assistant_available():
+        return None
+
+    try:
+        import numpy as np
+        from google.genai import types
+
+        resp = gemini_client().models.embed_content(
+            model=EMBED_MODEL,
+            contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=EMBED_DIM),
+        )
+        vec = np.array(resp.embeddings[0].values, dtype="float32")
+        vec /= max(float(np.linalg.norm(vec)), 1e-9)
+    except Exception as e:  # noqa: BLE001
+        print(f"query embedding failed: {str(e)[:160]}")
+        return None
+
+    if len(_query_vec_cache) > 1000:
+        _query_vec_cache.clear()
+    _query_vec_cache[key] = vec
+    return vec
+
+
 @app.get("/api/search")
 def search(
     q: str = "",
@@ -114,11 +263,30 @@ def search(
     sort: str = "match",
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=60),
+    ai: bool = True,
 ) -> dict[str, Any]:
-    today = date.today()
-    today_mmdd = today.month * 100 + today.day
+    load_vectors()
+    today_mmdd = date.today().month * 100 + date.today().day
+
+    # A typed phrase becomes filters + a subject to match on meaning. One word is
+    # not worth a model call: it is already a good text query on its own.
+    interpreted: dict[str, Any] = {}
+    if ai and len(q.split()) >= 2:
+        interpreted = parse_query(q) or {}
+
+    def inferred(key):
+        """Model guesses only fill gaps — an explicit filter is never overridden."""
+        value = interpreted.get(key)
+        return value if value not in (None, "", False) else None
 
     where, params = ["1=1"], {}
+    country = country or (inferred("country") or "")
+    level = level or (inferred("level") or "")
+    if max_tuition is None:
+        max_tuition = inferred("max_tuition_eur_year")
+    free_only = free_only or bool(inferred("free_only"))
+    max_ielts = inferred("max_ielts")
+
     if country:
         where.append("p.country = :country")
         params["country"] = country.upper()
@@ -140,25 +308,104 @@ def search(
         # so it does not survive a budget filter.
         where.append("p.tuition_eur_year IS NOT NULL AND p.tuition_eur_year <= :max_tuition")
         params["max_tuition"] = max_tuition
+    if max_ielts is not None:
+        where.append("p.ielts IS NOT NULL AND p.ielts <= :max_ielts")
+        params["max_ielts"] = max_ielts
 
-    terms = fts_terms(q) if q.strip() else []
-    join, rank = "", "0"
-    if terms:
-        join = "JOIN programs_fts f ON f.rowid = p.rowid"
-        where.append("programs_fts MATCH :term")
-        rank = "f.rank"
+    vec = query_vector(interpreted.get("subject") or q) if q.strip() else None
 
-    sort_sql = SORTS.get(sort, SORTS["match"])
-    sql = f"""
+    if vec is not None:
+        return semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted)
+    return text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted)
+
+
+def _base_sql(where: list[str], join: str, rank: str, order: str) -> str:
+    return f"""
         SELECT {CARD_FIELDS},
                {rank} AS rank_score,
                (SELECT MIN((d.mmdd - :today + 10000) % 10000)
                   FROM program_deadlines d WHERE d.uid = p.uid) AS next_deadline
         FROM programs p {join}
         WHERE {' AND '.join(where)}
-        ORDER BY {sort_sql}
-        LIMIT :limit OFFSET :offset
+        {order}
     """
+
+
+def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted):
+    """Rank the filtered set by meaning, then page in Python.
+
+    Scoring all matches in memory is fine at catalogue scale — a few thousand
+    dot products of 768 floats — and it keeps ranking in one place instead of
+    splitting it between SQL and here.
+    """
+    import numpy as np
+
+    conn = db()
+    try:
+        rows = conn.execute(_base_sql(where, "", "0", ""), {**params, "today": today_mmdd}).fetchall()
+    except sqlite3.OperationalError as e:
+        raise HTTPException(400, f"bad query: {e}") from e
+    finally:
+        conn.close()
+
+    positions = [(i, _vector_pos[r["uid"]]) for i, r in enumerate(rows) if r["uid"] in _vector_pos]
+    scored: list[tuple[float, sqlite3.Row]] = []
+    if positions:
+        idx = np.fromiter((p for _, p in positions), dtype=np.int64, count=len(positions))
+        sims = _vectors[idx] @ vec
+        for (row_i, _), sim in zip(positions, sims):
+            row = rows[row_i]
+            # A small nudge for completeness, so two similarly relevant
+            # programmes are ordered by which one a user can act on. Kept well
+            # below the relevance window so it breaks ties, not rankings.
+            scored.append((float(sim) + 0.004 * (row["quality"] or 0), row))
+    # Rows without a vector (a fresh source, not yet embedded) rank last rather
+    # than disappearing from results.
+    scored += [(-1.0, r) for r in rows if r["uid"] not in _vector_pos]
+
+    if sort == "tuition":
+        scored.sort(key=lambda s: (s[1]["tuition_eur_year"] is None, s[1]["tuition_eur_year"] or 0, -s[0]))
+    elif sort == "deadline":
+        scored.sort(key=lambda s: (s[1]["next_deadline"] is None, s[1]["next_deadline"] or 0, -s[0]))
+    elif sort == "ielts":
+        scored.sort(key=lambda s: (s[1]["ielts"] is None, s[1]["ielts"] or 0, -s[0]))
+    else:
+        scored.sort(key=lambda s: -s[0])
+
+    # Similarity scores sit in a narrow band (best ~0.75, median ~0.60), so cut
+    # relative to the best match rather than at an absolute value. Without this
+    # the count reads "1,716 programmes" for a query about one subject, which is
+    # true of the filter but useless as an answer.
+    in_filter = len(scored)
+    if scored and scored[0][0] > 0:
+        floor = scored[0][0] - 0.07
+        keep = max(24, sum(1 for s, _ in scored if s >= floor))
+        scored = scored[:min(keep, 300)]
+
+    start = (page - 1) * per_page
+    return {
+        "total": len(scored),
+        "total_in_filter": in_filter,
+        "page": page,
+        "per_page": per_page,
+        "broadened": False,
+        "semantic": True,
+        "interpreted": interpreted,
+        "items": [row_to_dict(r) for _, r in scored[start:start + per_page]],
+    }
+
+
+def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted):
+    """Fallback when there are no vectors or no credentials: FTS5 as before."""
+    terms = fts_terms(q) if q.strip() else []
+    join, rank = "", "0"
+    if terms:
+        join = "JOIN programs_fts f ON f.rowid = p.rowid"
+        where = where + ["programs_fts MATCH :term"]
+        rank = "f.rank"
+
+    order = f"ORDER BY {SORTS.get(sort, SORTS['match'])} LIMIT :limit OFFSET :offset"
+    sql = _base_sql(where, join, rank, order)
     count_sql = f"SELECT COUNT(*) FROM programs p {join} WHERE {' AND '.join(where)}"
 
     conn = db()
@@ -190,6 +437,8 @@ def search(
         "page": page,
         "per_page": per_page,
         "broadened": bool(terms) and not matched_all,
+        "semantic": False,
+        "interpreted": interpreted,
         "items": [row_to_dict(r) for r in rows],
     }
 
@@ -278,9 +527,25 @@ CONTEXT_FIELDS = [
 ]
 
 
-def build_context(row: dict[str, Any]) -> str:
+UK_COLUMN = {
+    "description": "description_uk",
+    "admission_requirements_raw": "admission_requirements_uk",
+    "language_requirement_raw": "language_requirement_uk",
+    "scholarships_raw": "scholarships_uk",
+    "semester_fee_raw": "semester_fee_uk",
+    "cost_of_living_raw": "cost_of_living_uk",
+    "support_international": "support_international_uk",
+    "application_deadline_raw": "application_deadline_uk",
+}
+
+
+def build_context(row: dict[str, Any], lang: str = "en") -> str:
     lines = []
     for label, key in CONTEXT_FIELDS:
+        # Hand it the Ukrainian text when answering in Ukrainian: it quotes the
+        # same wording the reader sees on the page, and translates nothing twice.
+        if lang == "uk" and UK_COLUMN.get(key) and row.get(UK_COLUMN[key]):
+            key = UK_COLUMN[key]
         value = row.get(key)
         if value in (None, "", [], 0.0) and not (key == "tuition_eur_year" and value == 0.0):
             continue
@@ -381,7 +646,8 @@ def ask(body: Ask, request: Request) -> JSONResponse:
                             status_code=503)
 
     language = {"uk": "Ukrainian", "en": "English"}.get(body.lang, "English")
-    parts = [SYSTEM.format(language=language), "PROGRAMME DATA:", build_context(row_to_dict(row))]
+    parts = [SYSTEM.format(language=language), "PROGRAMME DATA:",
+             build_context(row_to_dict(row), body.lang)]
     if body.selection:
         parts.append(f'The user highlighted this text on the page:\n"""{body.selection}"""')
     parts.append(f"USER QUESTION: {body.question}")
