@@ -2,7 +2,9 @@
 fastapi==0.140.0
 uvicorn[standard]==0.51.0
 google-genai==2.14.0
-numpy==2.5.1
+# psycopg serves both the catalogue (Postgres + pgvector) and the user data.
+# numpy is gone with the SQLite catalogue: it existed to hold every vector in
+# one matrix at startup, which is exactly what stopped scaling.
 # Accounts. pyjwt verifies Supabase's access tokens (ES256 on current projects,
 # so the crypto extra is not optional); psycopg holds the user data.
 pyjwt[crypto]==2.13.0

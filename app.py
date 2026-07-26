@@ -1,9 +1,10 @@
 """Kounsly API — search over the real catalogue, and a grounded assistant.
 
-The catalogue is a read-only SQLite file built by kounsly-pipeline, mounted from
-the host and opened per request, so search costs nothing to serve. It travelled
-inside the image until five countries made it 78 MB — see the Dockerfile for
-why that had to stop.
+The catalogue lives in Postgres with pgvector, built by kounsly-pipeline and
+loaded with publish_pg.py. It was a SQLite file until the search stopped
+scaling: every vector held in memory at startup, every query scored row by row
+in Python. Ranking still happens here — the relevance window, the nudge for
+completeness — but the candidates to rank come from an index.
 
 The assistant answers **only** from one programme's stored fields. It is not a
 general chatbot: an admissions answer that sounds right and is wrong costs a
@@ -13,8 +14,8 @@ in our data it says so and points at the official page.
 from __future__ import annotations
 
 import json
+import math
 import os
-import sqlite3
 import threading
 import time
 from collections import defaultdict, deque
@@ -30,18 +31,19 @@ from pydantic import BaseModel, Field
 import auth
 
 ROOT = Path(__file__).resolve().parent
-# In production this is a read-only bind mount from the host (/data/kounsly),
-# because the catalogue outgrew being committed to git. Locally it is the file
-# the pipeline writes next to this one, so `uvicorn app:app` still just works.
-DB_PATH = Path(os.getenv("KOUNSLY_DB", ROOT / "kounsly.db"))
 INDEX = ROOT / "index.html"
 
-if not DB_PATH.exists():
-    # Said once, loudly, at startup. Without this the first symptom is a
-    # sqlite "unable to open database file" on every request, which reads like
-    # a code bug rather than a missing mount.
-    print(f"FATAL: no catalogue at {DB_PATH}. In production this is the host "
-          f"mount; check the volume and KOUNSLY_DB.", flush=True)
+# The catalogue lives in Postgres with pgvector. It was a SQLite file until the
+# catalogue reached a size where the old search — every vector in a numpy matrix
+# at startup, every query scored row by row in Python — stopped being cheap.
+# Ranking still happens here; finding the candidates to rank happens in an index.
+PG_DSN = os.getenv("KOUNSLY_PG", "postgresql://kounsly@127.0.0.1:15433/kounsly")
+
+# Let the vector index keep looking when a filter is narrow. Without this an
+# HNSW scan returns its first ef_search neighbours and *then* applies WHERE, so
+# "data science in Denmark" can come back with three results out of a catalogue
+# that holds thirty. pgvector 0.8 added iterative scans for exactly this.
+PG_OPTIONS = "-c hnsw.iterative_scan=relaxed_order -c hnsw.ef_search=120"
 
 CHAT_MODEL = os.getenv("KOUNSLY_CHAT_MODEL", "gemini-3.6-flash")
 GCP_PROJECT = os.getenv("GCP_PROJECT", "kounsly")
@@ -91,24 +93,42 @@ EMBED_MODEL = os.getenv("KOUNSLY_EMBED_MODEL", "gemini-embedding-2")
 PARSE_MODEL = os.getenv("KOUNSLY_PARSE_MODEL", "gemini-3.5-flash-lite")
 EMBED_DIM = 768
 
-SORTS = {
-    # "Best match" with no search text is really "show your best records first":
-    # a programme whose deadline, requirements and costs are all known beats one
-    # that says "not listed" four times, even though both are equally relevant.
-    "match": "rank_score ASC, p.quality DESC",
-    "tuition": "tuition_eur_year IS NULL, tuition_eur_year ASC, p.quality DESC",
-    "deadline": "next_deadline IS NULL, next_deadline ASC",
-    "ielts": "ielts IS NULL, ielts ASC",
-}
+_pool: Any = None
+_pool_lock = threading.Lock()
 
 
-def db() -> sqlite3.Connection:
-    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+def pool():
+    """Connections to the catalogue, opened on first use.
+
+    Small on purpose: every query here is indexed and returns at most a page, so
+    the work is short and a handful of connections serve far more concurrency
+    than a search backend of this size will see.
+    """
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                from psycopg.rows import dict_row
+                from psycopg_pool import ConnectionPool
+
+                _pool = ConnectionPool(
+                    PG_DSN, min_size=1, max_size=8, timeout=10, max_idle=300,
+                    kwargs={"row_factory": dict_row, "prepare_threshold": None,
+                            "connect_timeout": 8, "options": PG_OPTIONS},
+                    open=True, check=ConnectionPool.check_connection,
+                )
+    return _pool
 
 
-def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+def query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    with pool().connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        return cur.fetchall() if cur.description else []
+
+
+def row_to_dict(row: dict[str, Any]) -> dict[str, Any]:
+    """Postgres hands back native types for most columns; these three are still
+    JSON text, because they are documents rather than fields."""
     out = dict(row)
     for key in ("languages", "deadlines", "extras"):
         if isinstance(out.get(key), str):
@@ -130,16 +150,16 @@ STOPWORDS = {
 
 
 def fts_terms(raw: str) -> list[str]:
-    """Turn free user text into safe FTS5 prefix tokens.
+    """Turn free user text into safe prefix tokens for a tsquery.
 
-    Users type sentences ("cheap data science master in English"), not FTS
+    Users type sentences ("cheap data science master in English"), not query
     syntax, and stray quotes or operators would otherwise be a syntax error.
     Filter/level words are dropped here because the filters already express
     them — leaving them in makes every query match half the catalogue.
     """
     cleaned = "".join(c if c.isalnum() or c.isspace() else " " for c in raw.lower())
     words = [w for w in cleaned.split() if len(w) > 2 and w not in STOPWORDS]
-    return [f'"{w}"*' for w in words[:8]]
+    return [f"{w}:*" for w in words[:8]]
 
 
 """--------------- semantic layer ---------------
@@ -157,42 +177,14 @@ Filters the user set by hand always win over anything the model inferred — the
 dropdowns are an instruction, the sentence is a guess.
 """
 
-_vectors: Any = None          # numpy matrix, L2-normalised rows
-_vector_uids: list[str] = []
-_vector_pos: dict[str, int] = {}
 _parse_cache: dict[str, dict] = {}
 _query_vec_cache: dict[str, Any] = {}
 
-
-def load_vectors() -> None:
-    global _vectors, _vector_uids, _vector_pos
-    if _vectors is not None:
-        return
-    try:
-        import numpy as np
-    except ImportError:
-        print("numpy missing — semantic search disabled, text search unaffected")
-        _vectors = False
-        return
-
-    conn = db()
-    try:
-        rows = conn.execute("SELECT uid, vec FROM program_vectors").fetchall()
-    except sqlite3.OperationalError:
-        rows = []          # database built before vectors existed
-    finally:
-        conn.close()
-
-    if not rows:
-        _vectors = False
-        return
-
-    matrix = np.frombuffer(b"".join(r["vec"] for r in rows), dtype="<f4").reshape(len(rows), EMBED_DIM)
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    _vectors = matrix / np.maximum(norms, 1e-9)
-    _vector_uids = [r["uid"] for r in rows]
-    _vector_pos = {uid: i for i, uid in enumerate(_vector_uids)}
-    print(f"semantic search ready: {len(rows)} vectors x {EMBED_DIM}")
+# How many neighbours the index is asked for before ranking happens here. The
+# ordering rules below — the relevance window, the nudge for completeness — are
+# unchanged; they just run over a few hundred candidates instead of the whole
+# catalogue. Wide enough that the cut-off never runs out of rows to cut.
+CANDIDATES = 400
 
 
 class ParsedQuery(BaseModel):
@@ -259,11 +251,10 @@ def query_vector(text: str):
     key = text.strip().lower()
     if key in _query_vec_cache:
         return _query_vec_cache[key]
-    if _vectors is False or not assistant_available():
+    if not assistant_available():
         return None
 
     try:
-        import numpy as np
         from google.genai import types
 
         resp = gemini_client().models.embed_content(
@@ -271,8 +262,12 @@ def query_vector(text: str):
             contents=text,
             config=types.EmbedContentConfig(output_dimensionality=EMBED_DIM),
         )
-        vec = np.array(resp.embeddings[0].values, dtype="float32")
-        vec /= max(float(np.linalg.norm(vec)), 1e-9)
+        # Normalised here so cosine distance and dot product agree, and in plain
+        # Python: numpy existed to hold the whole catalogue in a matrix, and the
+        # index does that job now. One vector of 768 floats does not need it.
+        raw = [float(v) for v in resp.embeddings[0].values]
+        norm = math.sqrt(sum(v * v for v in raw)) or 1.0
+        vec = [v / norm for v in raw]
     except Exception as e:  # noqa: BLE001
         print(f"query embedding failed: {str(e)[:160]}")
         return None
@@ -298,7 +293,6 @@ def search(
     per_page: int = Query(20, ge=1, le=60),
     ai: bool = True,
 ) -> dict[str, Any]:
-    load_vectors()
     today_mmdd = date.today().month * 100 + date.today().day
 
     # A typed phrase becomes filters + a subject to match on meaning. One word is
@@ -316,7 +310,8 @@ def search(
         value = interpreted.get(key)
         return value if value not in (None, "", False) else None
 
-    where, params = ["1=1"], {}
+    where: list[str] = ["TRUE"]
+    params: list[Any] = []
     country = country or (inferred("country") or "")
     level = level or (inferred("level") or "")
     if max_tuition is None:
@@ -325,17 +320,17 @@ def search(
     max_ielts = inferred("max_ielts")
 
     if country:
-        where.append("p.country = :country")
-        params["country"] = country.upper()
+        where.append("p.country = %s")
+        params.append(country.upper())
     if level:
-        where.append("p.degree_level = :level")
-        params["level"] = level
+        where.append("p.degree_level = %s")
+        params.append(level)
     if area:
-        where.append("p.area = :area")
-        params["area"] = area
+        where.append("p.area = %s")
+        params.append(area)
     if subject:
-        where.append("p.subject = :subject")
-        params["subject"] = subject
+        where.append("p.subject = %s")
+        params.append(subject)
     if free_only:
         where.append("p.tuition_free = 1")
     if english_only:
@@ -343,11 +338,11 @@ def search(
     if max_tuition is not None:
         # A programme with unknown tuition is not evidence of being affordable,
         # so it does not survive a budget filter.
-        where.append("p.tuition_eur_year IS NOT NULL AND p.tuition_eur_year <= :max_tuition")
-        params["max_tuition"] = max_tuition
+        where.append("p.tuition_eur_year IS NOT NULL AND p.tuition_eur_year <= %s")
+        params.append(max_tuition)
     if max_ielts is not None:
-        where.append("p.ielts IS NOT NULL AND p.ielts <= :max_ielts")
-        params["max_ielts"] = max_ielts
+        where.append("p.ielts IS NOT NULL AND p.ielts <= %s")
+        params.append(max_ielts)
 
     vec = query_vector(interpreted.get("subject") or q) if q.strip() else None
 
@@ -356,64 +351,82 @@ def search(
     return text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted)
 
 
-def _base_sql(where: list[str], join: str, rank: str, order: str) -> str:
-    return f"""
-        SELECT {CARD_FIELDS},
-               {rank} AS rank_score,
-               (SELECT MIN((d.mmdd - :today + 10000) % 10000)
-                  FROM program_deadlines d WHERE d.uid = p.uid) AS next_deadline
-        FROM programs p {join}
-        WHERE {' AND '.join(where)}
-        {order}
+# "Which date comes next" depends on today, so it cannot be precomputed — but it
+# no longer needs a second table and a join either. The dates sit on the row as
+# an array of MMDD integers and this is arithmetic over them.
+NEXT_DEADLINE = ("(SELECT MIN((d - %s + 10000) %% 10000) "
+                 "FROM unnest(p.deadline_mmdds) AS d) AS next_deadline")
+
+
+def order_by(sort: str) -> str:
+    """The same orderings as before, expressed for Postgres.
+
+    NULLS LAST is explicit: Postgres sorts nulls first on ASC, and a programme
+    with no stated tuition heading the "cheapest" list is the kind of quiet
+    wrongness that takes a week to notice.
     """
+    # Every ordering ends in uid. Without a total order the database is free to
+    # return ties in any order it likes, and it does — page 2 could repeat a row
+    # from page 1 and drop another entirely. Sorting by deadline puts thousands
+    # of programmes on the same date, so this is not a corner case.
+    return {
+        "tuition": "tuition_eur_year ASC NULLS LAST, quality DESC, uid",
+        "deadline": "next_deadline ASC NULLS LAST, quality DESC, uid",
+        "ielts": "ielts ASC NULLS LAST, quality DESC, uid",
+    }.get(sort, "rank ASC, quality DESC, uid")
 
 
 def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interpreted):
-    """Rank the filtered set by meaning, then page in Python.
+    """Ask the index for the nearest candidates, then rank them here.
 
-    Scoring all matches in memory is fine at catalogue scale — a few thousand
-    dot products of 768 floats — and it keeps ranking in one place instead of
-    splitting it between SQL and here.
+    The ranking rules are the ones this site has always used — a relevance
+    window relative to the best match, and a nudge for completeness — but they
+    now run over a few hundred rows the index picked out rather than over every
+    row that passed the filter. That is the whole point of the move: the same
+    answers, without reading the catalogue to produce them.
     """
-    import numpy as np
+    literal = "[" + ",".join(f"{v:.6f}" for v in vec) + "]"
+    clause = " AND ".join(where)
 
-    conn = db()
+    sql = f"""
+        SELECT {CARD_FIELDS},
+               1 - (p.vec <=> %s::vector) AS similarity,
+               {NEXT_DEADLINE}
+        FROM programs p
+        WHERE {clause} AND p.vec IS NOT NULL
+        ORDER BY p.vec <=> %s::vector
+        LIMIT %s
+    """
+    count_sql = f"SELECT COUNT(*) AS n FROM programs p WHERE {clause}"
+
     try:
-        rows = conn.execute(_base_sql(where, "", "0", ""), {**params, "today": today_mmdd}).fetchall()
-    except sqlite3.OperationalError as e:
-        raise HTTPException(400, f"bad query: {e}") from e
-    finally:
-        conn.close()
+        rows = query(sql, (literal, today_mmdd, *params, literal, CANDIDATES))
+        in_filter = query(count_sql, tuple(params))[0]["n"]
+    except Exception as e:  # noqa: BLE001 — a malformed filter is the caller's fault, not a 500
+        raise HTTPException(400, f"bad query: {str(e)[:200]}") from e
 
-    positions = [(i, _vector_pos[r["uid"]]) for i, r in enumerate(rows) if r["uid"] in _vector_pos]
-    scored: list[tuple[float, sqlite3.Row]] = []
-    if positions:
-        idx = np.fromiter((p for _, p in positions), dtype=np.int64, count=len(positions))
-        sims = _vectors[idx] @ vec
-        for (row_i, _), sim in zip(positions, sims):
-            row = rows[row_i]
-            # A small nudge for completeness, so two similarly relevant
-            # programmes are ordered by which one a user can act on. Kept well
-            # below the relevance window so it breaks ties, not rankings.
-            scored.append((float(sim) + 0.004 * (row["quality"] or 0), row))
-    # Rows without a vector (a fresh source, not yet embedded) rank last rather
-    # than disappearing from results.
-    scored += [(-1.0, r) for r in rows if r["uid"] not in _vector_pos]
+    # A small nudge for completeness, so two similarly relevant programmes are
+    # ordered by which one a user can act on. Kept well below the relevance
+    # window so it breaks ties, not rankings.
+    scored = [(float(r["similarity"]) + 0.004 * (r["quality"] or 0), r) for r in rows]
 
+    # Same rule as the SQL orderings: uid last, so a tie never reshuffles between
+    # one page and the next.
     if sort == "tuition":
-        scored.sort(key=lambda s: (s[1]["tuition_eur_year"] is None, s[1]["tuition_eur_year"] or 0, -s[0]))
+        scored.sort(key=lambda s: (s[1]["tuition_eur_year"] is None,
+                                   s[1]["tuition_eur_year"] or 0, -s[0], s[1]["uid"]))
     elif sort == "deadline":
-        scored.sort(key=lambda s: (s[1]["next_deadline"] is None, s[1]["next_deadline"] or 0, -s[0]))
+        scored.sort(key=lambda s: (s[1]["next_deadline"] is None,
+                                   s[1]["next_deadline"] or 0, -s[0], s[1]["uid"]))
     elif sort == "ielts":
-        scored.sort(key=lambda s: (s[1]["ielts"] is None, s[1]["ielts"] or 0, -s[0]))
+        scored.sort(key=lambda s: (s[1]["ielts"] is None, s[1]["ielts"] or 0, -s[0], s[1]["uid"]))
     else:
-        scored.sort(key=lambda s: -s[0])
+        scored.sort(key=lambda s: (-s[0], s[1]["uid"]))
 
     # Similarity scores sit in a narrow band (best ~0.75, median ~0.60), so cut
     # relative to the best match rather than at an absolute value. Without this
     # the count reads "1,716 programmes" for a query about one subject, which is
     # true of the filter but useless as an answer.
-    in_filter = len(scored)
     if scored and scored[0][0] > 0:
         floor = scored[0][0] - 0.07
         keep = max(24, sum(1 for s, _ in scored if s >= floor))
@@ -433,89 +446,87 @@ def semantic_search(where, params, vec, today_mmdd, sort, page, per_page, interp
 
 
 def text_search(where, params, q, today_mmdd, sort, page, per_page, interpreted):
-    """Fallback when there are no vectors or no credentials: FTS5 as before."""
+    """Fallback when there is no vector for the phrase, or no credentials.
+
+    Postgres' own text index, with the same two attempts as before: every word,
+    then any word. AND keeps "data science" meaning data science; OR keeps a
+    typo or an unusual phrasing from returning an empty page.
+    """
     terms = fts_terms(q) if q.strip() else []
-    join, rank = "", "0"
-    if terms:
-        join = "JOIN programs_fts f ON f.rowid = p.rowid"
-        where = where + ["programs_fts MATCH :term"]
-        rank = "f.rank"
+    attempts = [" & ".join(terms)] if terms else [None]
+    if len(terms) > 1:
+        attempts.append(" | ".join(terms))
 
-    order = f"ORDER BY {SORTS.get(sort, SORTS['match'])} LIMIT :limit OFFSET :offset"
-    sql = _base_sql(where, join, rank, order)
-    count_sql = f"SELECT COUNT(*) FROM programs p {join} WHERE {' AND '.join(where)}"
+    for i, tsquery in enumerate(attempts):
+        clause = " AND ".join(where + (["p.fts @@ to_tsquery('simple', %s)"] if tsquery else []))
+        rank = "ts_rank(p.fts, to_tsquery('simple', %s))" if tsquery else "0"
+        filters = (*params, tsquery) if tsquery else tuple(params)
 
-    conn = db()
-    try:
-        # All words first; fall back to any word only if that finds nothing. AND
-        # keeps "data science" meaning data science, OR keeps a typo or an
-        # unusual phrasing from returning an empty page.
-        attempts = [" AND ".join(terms)] if terms else [None]
-        if len(terms) > 1:
-            attempts.append(" OR ".join(terms))
+        count_sql = f"SELECT COUNT(*) AS n FROM programs p WHERE {clause}"
+        sql = f"""
+            SELECT {CARD_FIELDS},
+                   -{rank} AS rank,
+                   {NEXT_DEADLINE}
+            FROM programs p
+            WHERE {clause}
+            ORDER BY {order_by(sort)}
+            LIMIT %s OFFSET %s
+        """
+        try:
+            total = query(count_sql, filters)[0]["n"]
+            if not total and i < len(attempts) - 1:
+                continue
+            rank_params = (tsquery,) if tsquery else ()
+            rows = query(sql, (*rank_params, today_mmdd, *filters,
+                               per_page, (page - 1) * per_page))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(400, f"bad query: {str(e)[:200]}") from e
 
-        total, rows, matched_all = 0, [], True
-        for i, term in enumerate(attempts):
-            params_try = {**params, "term": term} if term else params
-            total = conn.execute(count_sql, params_try).fetchone()[0]
-            if total or i == len(attempts) - 1:
-                rows = conn.execute(sql, {**params_try, "today": today_mmdd,
-                                          "limit": per_page,
-                                          "offset": (page - 1) * per_page}).fetchall()
-                matched_all = i == 0
-                break
-    except sqlite3.OperationalError as e:
-        raise HTTPException(400, f"bad query: {e}") from e
-    finally:
-        conn.close()
-
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "broadened": bool(terms) and not matched_all,
-        "semantic": False,
-        "interpreted": interpreted,
-        "items": [row_to_dict(r) for r in rows],
-    }
+        return {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "broadened": bool(terms) and i > 0,
+            "semantic": False,
+            "interpreted": interpreted,
+            "items": [row_to_dict(r) for r in rows],
+        }
 
 
 @app.get("/api/facets")
 def facets() -> dict[str, Any]:
-    conn = db()
-    try:
-        def counts(column: str) -> list[dict[str, Any]]:
-            return [
-                {"value": v, "count": n}
-                for v, n in conn.execute(
-                    f"SELECT {column}, COUNT(*) FROM programs WHERE {column} IS NOT NULL "
-                    f"GROUP BY {column} ORDER BY COUNT(*) DESC"
-                )
-            ]
+    def counts(column: str) -> list[dict[str, Any]]:
+        return [
+            {"value": r["value"], "count": r["n"]}
+            for r in query(
+                f"SELECT {column} AS value, COUNT(*) AS n FROM programs "
+                # Ties broken by name, not by whatever order the rows came back
+                # in. The subject list is cut at 80, so an arbitrary tie at the
+                # boundary silently swaps one field of study for another between
+                # one deploy and the next.
+                f"WHERE {column} IS NOT NULL GROUP BY {column} "
+                f"ORDER BY COUNT(*) DESC, {column} ASC")
+        ]
 
-        return {
-            "countries": counts("country"),
-            "levels": counts("degree_level"),
-            "areas": counts("area"),
-            # Long tail truncated: 249 subjects is a catalogue, not a dropdown.
-            "subjects": counts("subject")[:80],
-            "total": conn.execute("SELECT COUNT(*) FROM programs").fetchone()[0],
-            "free": conn.execute("SELECT COUNT(*) FROM programs WHERE tuition_free = 1").fetchone()[0],
-        }
-    finally:
-        conn.close()
+    totals = query("SELECT COUNT(*) AS total, "
+                   "COUNT(*) FILTER (WHERE tuition_free = 1) AS free FROM programs")[0]
+    return {
+        "countries": counts("country"),
+        "levels": counts("degree_level"),
+        "areas": counts("area"),
+        # Long tail truncated: 249 subjects is a catalogue, not a dropdown.
+        "subjects": counts("subject")[:80],
+        "total": totals["total"],
+        "free": totals["free"],
+    }
 
 
 @app.get("/api/program/{uid}")
 def program(uid: str) -> dict[str, Any]:
-    conn = db()
-    try:
-        row = conn.execute("SELECT * FROM programs WHERE uid = ?", (uid,)).fetchone()
-    finally:
-        conn.close()
-    if not row:
+    rows = query("SELECT * FROM programs WHERE uid = %s", (uid,))
+    if not rows:
         raise HTTPException(404, "no such programme")
-    return row_to_dict(row)
+    return row_to_dict(rows[0])
 
 
 # ---------- grounded assistant ----------
@@ -699,13 +710,10 @@ def ask(body: Ask, request: Request) -> JSONResponse:
     if not allowance["allowed"]:
         return JSONResponse({"error": "quota", **allowance}, status_code=402)
 
-    conn = db()
-    try:
-        row = conn.execute("SELECT * FROM programs WHERE uid = ?", (body.uid,)).fetchone()
-    finally:
-        conn.close()
-    if not row:
+    found = query("SELECT * FROM programs WHERE uid = %s", (body.uid,))
+    if not found:
         raise HTTPException(404, "no such programme")
+    row = found[0]
 
     if not assistant_available():
         # Fail fast and clearly. Falling through would call google.auth.default(),
@@ -913,18 +921,11 @@ def programs_by_uid(uids: str = "") -> dict[str, Any]:
     if not wanted:
         return {"items": []}
     today_mmdd = date.today().month * 100 + date.today().day
-    placeholders = ",".join("?" * len(wanted))
-    conn = db()
-    try:
-        rows = conn.execute(
-            f"""SELECT {CARD_FIELDS},
-                       (SELECT MIN((d.mmdd - ? + 10000) % 10000)
-                          FROM program_deadlines d WHERE d.uid = p.uid) AS next_deadline
-                FROM programs p WHERE p.uid IN ({placeholders})""",
-            (today_mmdd, *wanted),
-        ).fetchall()
-    finally:
-        conn.close()
+    rows = query(
+        f"""SELECT {CARD_FIELDS}, {NEXT_DEADLINE}
+            FROM programs p WHERE p.uid = ANY(%s)""",
+        (today_mmdd, wanted),
+    )
     # Returned in the order asked for, which is the order they were saved in.
     by_uid = {r["uid"]: row_to_dict(r) for r in rows}
     return {"items": [by_uid[u] for u in wanted if u in by_uid]}
@@ -951,12 +952,8 @@ def assistant_available() -> bool:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    conn = db()
-    try:
-        n = conn.execute("SELECT COUNT(*) FROM programs").fetchone()[0]
-    finally:
-        conn.close()
-    return {"ok": True, "programmes": n, "db": DB_PATH.name,
+    n = query("SELECT COUNT(*) AS n FROM programs")[0]["n"]
+    return {"ok": True, "programmes": n, "db": "postgres",
             "assistant": assistant_available(), "accounts": auth.accounts_available()}
 
 
