@@ -126,7 +126,9 @@
       f_tuition: "Плата за навчання", f_deadline: "Найближчий дедлайн", f_english: "Англійська", f_duration: "Тривалість", f_ects: "Обсяг",
       open: "Детальніше →", broadened: "Точного збігу не знайшлось — показую близькі результати.",
       empty_t: "Нічого не знайшлось.", empty_b: "Спробуй інші слова або послаб фільтри.",
-      forget: "Прибрати з історії",
+      forget: "Прибрати з історії", forget_all: "Очистити все",
+      recent_t: "Твої пошуки", recent_more: "ще {n} у списку",
+      recent_all: "Показати всі", recent_less: "Згорнути",
       d_money: "Гроші", d_reqs: "Вимоги до вступу", d_lang: "Мова навчання й вимоги", d_deadlines: "Дедлайни",
       d_about: "Про програму", d_funding: "Фінансування та стипендії", d_support: "Підтримка іноземних студентів",
       d_semester: "Семестровий внесок", d_living: "Життя на місяць", d_apply: "Куди подаватися й де що шукати",
@@ -188,7 +190,9 @@
       f_tuition: "Tuition", f_deadline: "Next deadline", f_english: "English", f_duration: "Duration", f_ects: "Credits",
       open: "Details →", broadened: "No exact match — showing close results.",
       empty_t: "Nothing matched.", empty_b: "Try different words or loosen the filters.",
-      forget: "Remove from history",
+      forget: "Remove from history", forget_all: "Clear all",
+      recent_t: "Your searches", recent_more: "{n} more",
+      recent_all: "Show all", recent_less: "Show fewer",
       d_money: "Money", d_reqs: "Admission requirements", d_lang: "Teaching language & requirements", d_deadlines: "Deadlines",
       d_about: "About the programme", d_funding: "Funding & scholarships", d_support: "Support for international students",
       d_semester: "Semester contribution", d_living: "Living cost per month", d_apply: "Where to apply and where to look",
@@ -258,7 +262,9 @@
     LT: { uk: "Литва", en: "Lithuania", flag: "🇱🇹" },
     GB: { uk: "Велика Британія", en: "United Kingdom", flag: "🇬🇧" },
     RS: { uk: "Сербія", en: "Serbia", flag: "🇷🇸" },
-    TR: { uk: "Туреччина", en: "Türkiye", flag: "🇹🇷" }
+    TR: { uk: "Туреччина", en: "Türkiye", flag: "🇹🇷" },
+    US: { uk: "США", en: "United States", flag: "🇺🇸" },
+    CA: { uk: "Канада", en: "Canada", flag: "🇨🇦" }
   };
   function countryName(code) { var c = COUNTRY[code]; return c ? c[lang] || c.en : code; }
   function countryFlag(code) { return (COUNTRY[code] || {}).flag || ""; }
@@ -604,31 +610,81 @@
     runSearch();
   }
 
+  /* Past searches, under the box they were typed into.
+   *
+   * They used to be eight chips sitting permanently below the field, which
+   * meant the row was either in the way or ignored, and there was nowhere to
+   * see the rest of them. As a panel they behave the way every search box
+   * behaves: closed until the field is focused, one row per search, a ✕ per
+   * row, and a way to clear the lot.
+   *
+   * The examples stay visible now instead of being replaced by the history —
+   * they teach the phrasing, and the phrasing is what makes this search work.
+   */
+  var HISTORY_SHOWN = 6;
+  var suggOpen = false, suggAll = false;
+
   function paintRecent() {
-    var box = $("recent"), examples = $("examples");
+    var box = $("sugg");
     if (!box) return;
     var recent = A ? A.history() : [];
-    box.innerHTML = "";
-    box.hidden = !recent.length;
-    if (examples) examples.hidden = !!recent.length;
-    if (!recent.length) return;
+    if (!recent.length || !suggOpen) { box.hidden = true; box.innerHTML = ""; return; }
 
-    recent.forEach(function (item) {
-      var chip = el("button", "chip");
-      chip.type = "button";
-      chip.appendChild(document.createTextNode(item.q));
-      var x = el("span", "x", "✕");
+    var shown = suggAll ? recent : recent.slice(0, HISTORY_SHOWN);
+    box.innerHTML = "";
+    box.hidden = false;
+
+    var head = el("div", "head");
+    head.appendChild(el("b", null, T("recent_t")));
+    var clear = el("button", "ac-quiet", T("forget_all"));
+    clear.type = "button";
+    clear.onclick = function (e) { e.stopPropagation(); suggAll = false; A.forgetSearch(""); };
+    head.appendChild(clear);
+    box.appendChild(head);
+
+    shown.forEach(function (item) {
+      var row = el("button", "sugg-row");
+      row.type = "button";
+      row.appendChild(el("span", "ic", "↺"));
+      row.appendChild(el("span", "q", item.q));
+      if (item.at) row.appendChild(el("span", "when", whenLabel(item.at)));
+      var x = el("button", "x", "✕");
+      x.type = "button";
       x.title = T("forget");
-      chip.appendChild(x);
-      chip.addEventListener("click", function (e) {
-        // The ✕ is inside the chip so that the whole row stays one row; the
-        // click has to be told apart from a click on the search itself.
-        if (e.target === x) { e.stopPropagation(); A.forgetSearch(item.q); return; }
-        restoreSearch(item.q, item.params);
-      });
-      box.appendChild(chip);
+      x.setAttribute("aria-label", T("forget"));
+      x.onclick = function (e) { e.stopPropagation(); A.forgetSearch(item.q); };
+      row.appendChild(x);
+      row.onclick = function () { closeSugg(); restoreSearch(item.q, item.params); };
+      box.appendChild(row);
     });
+
+    if (recent.length > HISTORY_SHOWN) {
+      var foot = el("div", "foot");
+      // Only while there is something still hidden: "0 more" under an expanded
+      // list is a count of nothing.
+      foot.appendChild(el("span", null, suggAll ? "" : T("recent_more").replace("{n}", recent.length - shown.length)));
+      var all = el("button", "ac-quiet", T(suggAll ? "recent_less" : "recent_all"));
+      all.type = "button";
+      all.onclick = function (e) { e.stopPropagation(); suggAll = !suggAll; paintRecent(); };
+      foot.appendChild(all);
+      box.appendChild(foot);
+    }
   }
+
+  /** Today's searches by the clock, older ones by the date: "11:04" is only
+   *  useful while it is still today. */
+  function whenLabel(iso) {
+    var d = new Date(iso.replace(" ", "T"));
+    if (isNaN(d)) return "";
+    var now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) return d.toTimeString().slice(0, 5);
+    var loc = lang === "uk" ? "uk-UA" : "en-GB";
+    return d.toLocaleDateString(loc, { day: "numeric", month: "short" });
+  }
+
+  function openSugg() { suggOpen = true; paintRecent(); }
+  function closeSugg() { suggOpen = false; suggAll = false; paintRecent(); }
 
   function paintQuota(node) {
     var q = A && A.quota();
@@ -1230,8 +1286,21 @@
 
   function bind() {
     $("q").addEventListener("input", onQuery);
-    $("go").addEventListener("click", function () { state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); });
-    $("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); } });
+    $("go").addEventListener("click", function () { closeSugg(); state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); });
+    $("q").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { closeSugg(); state.q = $("q").value.trim(); state.page = 1; state.ai = true; runSearch(); }
+      if (e.key === "Escape") closeSugg();
+    });
+
+    // The panel opens on focus and closes on anything that isn't it. Not on
+    // blur: the ✕ inside a row takes focus away from the field, and closing
+    // there would make one row disappear along with the whole panel.
+    $("q").addEventListener("focus", openSugg);
+    document.addEventListener("click", function (e) {
+      if (!suggOpen) return;
+      if (e.target.closest && e.target.closest(".sbox")) return;
+      closeSugg();
+    });
 
     [["f-region", "country"], ["f-country", "area"], ["f-field", "subject"], ["f-level", "level"], ["f-budget", "budget"], ["f-sort", "sort"]]
       .forEach(function (pair) {
@@ -1266,6 +1335,43 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSheet(); });
   }
 
+  /* Where a search starts from, when the profile says something about it.
+   *
+   * Only ever a starting position, and only into filters the reader has not
+   * touched: a profile that silently narrows a search someone is already in
+   * the middle of would be the same mistake as a deadline shown without saying
+   * whose it is. Everything it sets is visible in the filter column and
+   * clearable with one click on "reset".
+   */
+  function applyProfileDefaults() {
+    var p = profile();
+    if (!p) return false;
+    var touched = false;
+    if (!state.level && p.want_level && p.want_level !== "any") { state.level = p.want_level; touched = true; }
+    if (!state.budget && !state.free && p.budget_max != null) {
+      if (Number(p.budget_max) === 0) { state.free = true; $("f-free").checked = true; }
+      else state.budget = String(p.budget_max);
+      touched = true;
+    }
+    if (touched) buildSelects();
+    return touched;
+  }
+
+  /* What the account page borrows. The saved list has to be the same card as a
+   * search result — same star, same eligibility line, same "your deadline" —
+   * and the only way to guarantee that is for there to be one card renderer. */
+  window.KounslyApp = {
+    card: card,
+    ownDeadlines: ownDeadlines,
+    nextDeadline: nextDeadline,
+    isMyDeadline: isMyDeadline,
+    dateLabel: dateLabel,
+    daysLabel: daysLabel,
+    deadlineWho: function (appliesTo) { return T("dl_" + appliesTo); },
+    countryName: countryName,
+    applyProfileDefaults: applyProfileDefaults
+  };
+
   applyI18n();
   bind();
   bindTheme();
@@ -1281,6 +1387,9 @@
   ]).then(function (both) {
     facets = both[1];
     if (facets) buildSelects();
+    // After facets, before the first search: the filters have to exist before
+    // a profile can preselect anything in them.
+    applyProfileDefaults();
     runSearch();
     // Back from Google or Apple: reopen what they were reading.
     var resume = A && A.resumeUid();
