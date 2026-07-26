@@ -89,31 +89,42 @@ Google — the confirmation and password-reset e-mails both come back to the sit
 with the tokens in the fragment, and an address that is not on the redirect list
 is refused after the reader has already clicked. See §5.
 
-### The code fallback — the one easy thing to get wrong
+### The code fallback needs SMTP first — it is off by default
 
-Under the password form there is *"Увійти кодом з пошти"*, which sends a
-**six-digit code** rather than a magic link. Supabase's default template only
-sends a link, and a reader gets an e-mail with nothing to type into the box.
+Under the password form there can be *"Увійти кодом з пошти"*, which sends a
+**six-digit code** rather than a magic link. It is hidden unless
+`KOUNSLY_EMAIL_CODE=on`, and it must stay hidden until custom SMTP is
+configured. The reason is a wall, not a preference:
 
-**Authentication → Email Templates → Magic Link**: make sure the body contains
-`{{ .Token }}`. Something like:
+**Supabase refuses to edit e-mail templates while the built-in mailer is in
+use.** The Emails screen says so directly — *"Set up custom SMTP to edit
+templates"*. The stock Magic Link template sends a **link**, and the box asks
+for six digits, so a reader would get an e-mail with nothing to type. The link
+does sign them in if they click it, which makes this worse rather than better:
+it half-works, which is the hardest kind of thing to notice is broken.
+
+Once SMTP is set up, the template becomes editable. Put `{{ .Token }}` in the
+body of **Authentication → Emails → Magic link or OTP**:
 
 ```
 Your Kounsly code: {{ .Token }}
 It expires in an hour. If you didn't ask for it, ignore this e-mail.
 ```
 
-Keeping `{{ .ConfirmationURL }}` as well is fine — then both work.
+Keeping `{{ .ConfirmationURL }}` as well is fine — then both work. Set
+`KOUNSLY_EMAIL_CODE=on` in the **same** change, not before.
 
-The **Confirm signup** and **Reset password** templates need no editing: both
-ship with `{{ .ConfirmationURL }}`, which is exactly what the password flow
-uses.
+The **Confirm signup** and **Reset password** templates need no editing at all,
+which is why password sign-in works fine on the built-in mailer: both stock
+templates carry `{{ .ConfirmationURL }}`, and that is exactly what the password
+flow uses.
 
 Supabase's built-in mailer is rate-limited to a handful of messages an hour,
 which is enough for testing and not enough for launch. Every password sign-up
 sends one, so this is the first thing that will bite on a launch day. Before
 real traffic, point **Authentication → Emails → SMTP** at Resend or Postmark
-from the domain you already send outreach from.
+from the domain you already send outreach from — which also unlocks the code
+flow above.
 
 ## 5. URLs
 
@@ -138,6 +149,7 @@ Optional, all with sensible defaults:
 
 ```
 KOUNSLY_PROVIDERS=google,apple,email   # drop one to hide its button
+KOUNSLY_EMAIL_CODE=off                 # "sign in with a code" — needs custom SMTP first
 KOUNSLY_ANON_ASKS=3                    # free questions before signing in, per device
 KOUNSLY_FREE_ASKS=15                   # per month, with an account
 KOUNSLY_PRO_ASKS=600                   # ceiling on the paid plan, not a plan limit

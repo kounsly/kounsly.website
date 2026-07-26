@@ -365,6 +365,13 @@ def public_config() -> dict[str, Any]:
         "providers": [p.strip() for p in os.getenv("KOUNSLY_PROVIDERS", "google,apple,email").split(",") if p.strip()],
         "anon_asks": ANON_ASKS,
         "free_asks": FREE_ASKS_PER_MONTH,
+        # Off until custom SMTP is configured, and for a specific reason:
+        # Supabase refuses to edit e-mail templates on its built-in mailer, and
+        # the stock Magic Link template sends a *link*, not the six-digit token
+        # our box asks for. Offering "e-mail me a code" that answers with a link
+        # is worse than not offering it. Turn this on in the same change as the
+        # SMTP settings, not before.
+        "email_code": os.getenv("KOUNSLY_EMAIL_CODE", "").lower() in ("1", "true", "on", "yes"),
         # Off until something actually sends the reminders. The button is a
         # promise — "we will e-mail you before this closes" — and a promise with
         # no sender behind it is the same mistake as telling someone which

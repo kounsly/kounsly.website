@@ -1,10 +1,9 @@
 -- Kounsly user data. Run once against the Supabase project's Postgres.
 --
--- The catalogue stays where it is: a read-only SQLite file in the image. This
--- is the *other* half — the writable one — and it holds only what belongs to a
--- person: who they are, what they saved, what they asked. Keeping the two apart
--- means a data rebuild is still an ordinary deploy and can never touch a user
--- row.
+-- The catalogue stays where it is: a read-only SQLite file mounted from the
+-- host. This is the *other* half — the writable one — and it holds only what
+-- belongs to a person: who they are, what they saved, what they searched for.
+-- Keeping the two apart means a data rebuild can never touch a user row.
 --
 -- Identity lives in Supabase's own auth.users. We never store passwords, tokens
 -- or OAuth secrets; app_user.id is a foreign key to it and nothing more.

@@ -535,7 +535,10 @@
       '<div class="gate-links">' +
         '<button type="button" data-act="mode">' + esc(T(mode === "up" ? "to_in" : "to_up")) + "</button>" +
         (mode === "up" ? "" : '<button type="button" data-act="forgot">' + esc(T("pw_forgot")) + "</button>") +
-        '<button type="button" data-act="code">' + esc(T("pw_code")) + "</button>" +
+        // Only when the project can actually send a code — see email_code in
+        // auth.py. Without custom SMTP the e-mail carries a link instead, and
+        // the reader is left staring at a box for six digits that never come.
+        (cfg.email_code ? '<button type="button" data-act="code">' + esc(T("pw_code")) + "</button>" : "") +
       "</div>" +
       '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
 
