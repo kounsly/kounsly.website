@@ -517,12 +517,23 @@
    * login form instead turns an offer into a toll gate.
    */
 
+  /* Drawn, not typed. The ♥ glyph renders differently in every font, comes out
+     thin at this size, and its outline twin ♡ is thinner still — at 14px the
+     control that keeps a programme was barely visible. One path, filled when
+     the programme is kept. */
+  function heart(on) {
+    return '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" focusable="false">' +
+      '<path d="M12 20.4 4.2 12.6a4.9 4.9 0 0 1 0-7 5 5 0 0 1 7 0l.8.8.8-.8a5 5 0 0 1 7 0 4.9 4.9 0 0 1 0 7z" ' +
+      'fill="' + (on ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>' +
+      "</svg>";
+  }
+
   function saveStar(uid) {
     if (!A || !A.enabled) return "";
     var on = A.isSaved(uid);
     return '<button class="save' + (on ? " on" : "") + '" data-uid="' + esc(uid) + '"' +
       ' aria-label="' + esc(T("save_aria")) + '" aria-pressed="' + (on ? "true" : "false") + '">' +
-      (on ? "♥" : "♡") + "</button>";
+      heart(on) + "</button>";
   }
 
   function actsHTML(p) {
@@ -530,7 +541,7 @@
     var saved = A.isSaved(p.uid), watched = A.isWatched(p.uid);
     return '<div class="sheet-acts">' +
       '<button class="sheet-act' + (saved ? " on" : "") + '" data-act="save" data-uid="' + esc(p.uid) + '">' +
-        "<span>" + (saved ? "♥" : "♡") + "</span>" + esc(T(saved ? "saved" : "save")) + "</button>" +
+        "<span>" + heart(saved) + "</span>" + esc(T(saved ? "saved" : "save")) + "</button>" +
       // Only once there is a sender behind it. Offering to e-mail someone before
       // a deadline, and then not doing it, costs more than never offering.
       (A.reminders()
@@ -570,7 +581,7 @@
     document.querySelectorAll(".save[data-uid]").forEach(function (b) {
       var on = A.isSaved(b.getAttribute("data-uid"));
       b.classList.toggle("on", on);
-      b.textContent = on ? "♥" : "♡";
+      b.innerHTML = heart(on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     var acts = document.querySelector(".sheet-acts");

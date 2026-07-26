@@ -373,19 +373,23 @@
    same top-right corner, and the button was landing on top of "Master of
    Science". The badge gives way, because it is the one that can be read from
    the title anyway. */
-.card:has(.save) .top{padding-right:38px}
+.card:has(.save) .top{padding-right:46px}
 
+/* Always there, in its own frame. It used to fade in on hover, which meant the
+   one control worth an account was invisible until you happened to point at
+   the card — and invisible altogether to anyone who never hovers. A button
+   that keeps something has to look like a button before it is touched. */
 .save{
-  position:absolute;top:14px;right:14px;z-index:2;
-  width:32px;height:32px;border-radius:9px;border:1px solid transparent;
-  background:none;color:var(--faint);font-size:1.05rem;line-height:1;cursor:pointer;
-  opacity:0;transition:opacity .16s ease,color .16s ease;
+  position:absolute;top:13px;right:14px;z-index:2;
+  width:34px;height:34px;border-radius:10px;
+  border:1px solid var(--brd-2);background:var(--panel);color:var(--faint);
+  display:grid;place-items:center;cursor:pointer;line-height:0;
+  transition:color .14s ease,border-color .14s ease,background .14s ease;
 }
 .card{position:relative}
-.card:hover .save,.card:focus-within .save,.save.on{opacity:1}
-.save:hover{color:var(--accent);border-color:var(--brd)}
-.save.on{color:var(--accent)}
-@media (hover:none){.save{opacity:1}}   /* no hover on a phone: always visible */
+.save:hover{color:var(--accent);border-color:var(--accent)}
+.save.on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:var(--accent-soft)}
+.sheet-act svg{display:block}
 
 /* In the detail sheet the two actions are stated in words — this is where the
    reader decides, and an unlabelled icon is not a decision. */
