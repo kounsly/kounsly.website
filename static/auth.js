@@ -268,7 +268,9 @@
         emit();
         return d;
       })
-      .catch(function () { return null; });
+      // Never silent: a failed /api/me still means "nobody is signed in", and
+      // the header has to say so rather than stay blank.
+      .catch(function () { me = null; emit(); return null; });
   }
 
   /* ---------- sign-in flows ---------- */
@@ -1022,7 +1024,14 @@
           cfg = c || cfg;
           api.enabled = !!cfg.enabled;
           anonQuota = cfg.quota || null;
-          if (!api.enabled) { emit(); return null; }
+          // Paint here, before anything is asked about *this* reader. Whether
+          // accounts exist at all is everything the header needs to show a
+          // "sign in" button — and every path below this line can finish
+          // without an emit: a stale token whose refresh fails ends in loadMe's
+          // catch, and the header then sat empty until something else happened
+          // to redraw it. Which is exactly what switching the language did.
+          emit();
+          if (!api.enabled) return null;
           // An expired confirmation or reset link: say so rather than dropping
           // them on a page that looks like it ignored the click.
           if (arrivalType === "error") { emit(); openGate("default", null); return null; }
