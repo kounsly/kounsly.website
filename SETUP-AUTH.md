@@ -135,6 +135,22 @@ flow above.
 A missing entry here fails at the worst possible moment — after the user has
 already approved at Google — and looks like the sign-in silently doing nothing.
 
+**Type these in by hand. Do not paste them.** A pasted value picks up invisible
+characters from wherever it was copied — this cost an hour on the first
+sign-up, when a non-breaking space (U+00A0) landed in front of the Site URL.
+Supabase then stopped seeing an absolute URL and treated the value as a path
+relative to itself, so the confirmation link went to
+
+```
+https://<ref>.supabase.co/auth/v1/%c2%a0https://kounsly.com#access_token=…
+```
+
+and answered `{"message":"No API key found in request"}`. The sign-up itself had
+worked — the token is right there in the fragment — which is what makes this
+hard to read: the failure looks like broken auth and is actually a broken
+redirect. If you see that message with a token in the URL, the Site URL has
+something invisible in it.
+
 ## 6. Coolify
 
 Add to the application's environment:
