@@ -522,7 +522,7 @@
     var on = A.isSaved(uid);
     return '<button class="save' + (on ? " on" : "") + '" data-uid="' + esc(uid) + '"' +
       ' aria-label="' + esc(T("save_aria")) + '" aria-pressed="' + (on ? "true" : "false") + '">' +
-      (on ? "★" : "☆") + "</button>";
+      (on ? "♥" : "♡") + "</button>";
   }
 
   function actsHTML(p) {
@@ -530,7 +530,7 @@
     var saved = A.isSaved(p.uid), watched = A.isWatched(p.uid);
     return '<div class="sheet-acts">' +
       '<button class="sheet-act' + (saved ? " on" : "") + '" data-act="save" data-uid="' + esc(p.uid) + '">' +
-        "<span>" + (saved ? "★" : "☆") + "</span>" + esc(T(saved ? "saved" : "save")) + "</button>" +
+        "<span>" + (saved ? "♥" : "♡") + "</span>" + esc(T(saved ? "saved" : "save")) + "</button>" +
       // Only once there is a sender behind it. Offering to e-mail someone before
       // a deadline, and then not doing it, costs more than never offering.
       (A.reminders()
@@ -570,7 +570,7 @@
     document.querySelectorAll(".save[data-uid]").forEach(function (b) {
       var on = A.isSaved(b.getAttribute("data-uid"));
       b.classList.toggle("on", on);
-      b.textContent = on ? "★" : "☆";
+      b.textContent = on ? "♥" : "♡";
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     var acts = document.querySelector(".sheet-acts");

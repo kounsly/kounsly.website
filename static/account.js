@@ -67,9 +67,6 @@
       count_saved: "{n} програм", applying_n: "{n} подаюсь",
 
       s_login: "Вхід", f_email: "Пошта", f_pw: "Пароль", pw_change: "Новий пароль",
-      s_export: "Забрати свої дані",
-      b_export: "Один JSON: профіль, збережені програми з нотатками, дедлайни, історія пошуку, лічильник питань. Чого немає у файлі — того ми про тебе й не зберігаємо.",
-      export: "Завантажити JSON", export_err: "Не вдалося зібрати файл. Спробуй ще раз.",
       s_delete: "Видалити всі свої дані",
       b_delete: "Зникають профіль, збережені, нотатки, дедлайни й історія — назавжди, без кошика. Каталог це не чіпає: пошуком можна користуватися й без акаунта.",
       b_delete_auth: "Твоя пошта лишиться у списку входів Supabase — стерти її можемо тільки ключем, який відкриває всі акаунти проєкту, і такого ключа ми на сервері не тримаємо. Але за нею більше не буде жодних твоїх даних.",
@@ -118,9 +115,6 @@
       count_saved: "{n} programmes", applying_n: "{n} applying",
 
       s_login: "Sign-in", f_email: "E-mail", f_pw: "Password", pw_change: "New password",
-      s_export: "Take your data",
-      b_export: "One JSON: profile, saved programmes with notes, deadlines, search history, question counter. What isn't in the file is what we don't keep.",
-      export: "Download JSON", export_err: "Couldn't build the file. Try again.",
       s_delete: "Delete all your data",
       b_delete: "Profile, saved list, notes, deadlines and history — gone for good, no bin to recover from. The catalogue is untouched: search works without an account.",
       b_delete_auth: "Your address stays in Supabase's own sign-in list — removing it needs a key that opens every account in the project, and we don't keep one on the server. Nothing of yours will be behind it.",
@@ -187,11 +181,12 @@
     opened = true;
     draft = null;
     document.body.setAttribute("data-view", "account");
+    document.body.style.overflow = "hidden";     // the page behind stays put
     root().hidden = false;
     if (location.hash !== "#account/" + section) {
       history.pushState({ account: section }, "", "#account/" + section);
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    root().scrollTop = 0;
     paint();
   }
 
@@ -199,6 +194,7 @@
     if (!root()) return;
     opened = false;
     document.body.removeAttribute("data-view");
+    document.body.style.overflow = "";
     root().hidden = true;
     root().innerHTML = "";
     if (!fromPop && location.hash.indexOf("#account") === 0) history.pushState({}, "", location.pathname);
@@ -215,11 +211,28 @@
       section = sec;
       opened = true;
       document.body.setAttribute("data-view", "account");
+      document.body.style.overflow = "hidden";
       root().hidden = false;
       paint();
     } else if (opened) {
       close(true);
     }
+  });
+
+  /* Clicking the blurred page behind is the way out — it is what everyone
+     tries first, and the page is right there to be clicked. Only on the
+     backdrop itself, never on a click that started inside the window. */
+  document.addEventListener("click", function (e) {
+    if (opened && e.target === root()) close();
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || !opened) return;
+    // A programme opened from inside the saved list sits on top and has its
+    // own Escape. Closing the account underneath it would be closing the wrong
+    // thing.
+    if (document.querySelector(".sheet-wrap.open")) return;
+    close();
   });
 
   /* ---------- shell ---------- */
@@ -228,9 +241,18 @@
     if (!opened) return;
     var box = root();
     box.innerHTML = "";
-    box.appendChild(rail());
+    var shell = el("div", "ac-shell");
+    box.appendChild(shell);
+
+    var x = el("button", "ac-close", "\u2715");
+    x.type = "button";
+    x.setAttribute("aria-label", T("back"));
+    x.onclick = function () { close(); };
+    shell.appendChild(x);
+
+    shell.appendChild(rail());
     var main = el("div", "ac-main");
-    box.appendChild(main);
+    shell.appendChild(main);
 
     var head = el("div", "ac-head");
     head.appendChild(el("h1", null, T("title_" + section)));
@@ -562,14 +584,27 @@
     if (P().card) item.appendChild(P().card(row));
 
     var strip = el("div", "ac-strip");
+    var pills = [];
+    // Painted on click, corrected if the write fails — the same rule the star
+    // follows. Waiting for the round trip made the pill look like it had
+    // ignored the click, and clicking a status is the cheapest thing here.
+    function paintPills(state) {
+      pills.forEach(function (p) { p.setAttribute("aria-pressed", String(p.getAttribute("data-v") === state)); });
+      item.setAttribute("data-state", state || "");
+    }
     ["applying", "thinking", "dropped"].forEach(function (v) {
       var b = el("button", "ac-state", T("st_" + v));
       b.type = "button";
       b.setAttribute("data-v", v);
       b.setAttribute("aria-pressed", String(meta.state === v));
       b.onclick = function () {
-        A.annotateSaved(row.uid, { state: meta.state === v ? null : v }, true).then(paint);
+        var was = meta.state;
+        meta.state = was === v ? null : v;
+        paintPills(meta.state);
+        A.annotateSaved(row.uid, { state: meta.state }, true)
+          .catch(function () { meta.state = was; paintPills(was); });
       };
+      pills.push(b);
       strip.appendChild(b);
     });
 
@@ -656,19 +691,6 @@
     pwBtn.type = "button";
     pwBtn.onclick = function () { A.newPassword(); };
     pw.appendChild(pwBtn);
-
-    var exp = pane(main, "s_export", "b_export");
-    var expBtn = el("button", "btn", T("export"));
-    expBtn.type = "button";
-    var expMsg = el("span", "ac-saved-msg");
-    expBtn.onclick = function () {
-      expBtn.disabled = true;
-      A.exportData()
-        .then(function () { expBtn.disabled = false; })
-        .catch(function () { expBtn.disabled = false; expMsg.textContent = T("export_err"); });
-    };
-    exp.appendChild(expBtn);
-    exp.appendChild(expMsg);
 
     /* Two steps, and the second one asks for a word. Not friction for its own
        sake: this is the only button on the site that destroys something. */

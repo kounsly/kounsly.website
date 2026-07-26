@@ -369,6 +369,12 @@
 /* ---------- save / watch ----------
    The star sits on the card, not behind a menu: it is the first thing worth an
    account, so it has to be visible before anyone has one. */
+/* The badge names the degree and the button keeps the programme; both want the
+   same top-right corner, and the button was landing on top of "Master of
+   Science". The badge gives way, because it is the one that can be read from
+   the title anyway. */
+.card:has(.save) .top{padding-right:38px}
+
 .save{
   position:absolute;top:14px;right:14px;z-index:2;
   width:32px;height:32px;border-radius:9px;border:1px solid transparent;
