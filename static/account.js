@@ -31,7 +31,7 @@
       title_profile: "Профіль", title_saved: "Збережені", title_deadlines: "Дедлайни", title_data: "Дані й безпека",
       lede_profile: "Кожне поле тут щось робить: вирішує, який дедлайн твій, чи вистачає твоїх балів і з чого починається пошук. Порожні поля нічого не ламають — просто менше підказок.",
       lede_saved: "Не фільтр видачі, а робочий список: де ти з кожною програмою і що про неї зрозуміла.",
-      lede_deadlines: "Тільки програми, за дедлайнами яких ти стежиш. Твоя дата підсвічена — решта лишаються видимими, бо бачити тільки свою небезпечно, якщо профіль неточний.",
+      lede_deadlines: "Усе, що ти зберегла серцем, за датами. Показуємо ту дату, яка стосується саме тебе: якщо на сторінці програми окремі дедлайни для ЄС і для не-ЄС, беремо твій за громадянством із профілю. Якщо груп не вказано — беремо найближчу спільну.",
       lede_data: "Усе, що ми про тебе зберігаємо, можна забрати одним файлом або стерти назавжди.",
       back: "← До пошуку", since: "з {d}", plan_free: "Безкоштовний план", plan_pro: "Pro",
 
@@ -63,7 +63,10 @@
       note_saving: "Зберігаю…", note_saved: "Збережено",
       sort_deadline: "Спочатку найближчий дедлайн", sort_added: "Спочатку додані останніми",
       empty_saved: "Тут поки порожньо — тисни ★ на будь-якій програмі.",
-      empty_watch: "Ти ще не стежиш за жодним дедлайном. Кнопка «нагадати» — у картці програми.",
+      empty_watch: "Порожньо. Збережи програму серцем — і її дедлайн з'явиться тут.",
+      no_date: "Дату подачі на офіційній сторінці не вказано.",
+      who_hint: "Не знаємо твого громадянства, тому показуємо найближчу дату з усіх.",
+      who_hint_go: "Вказати в профілі",
       count_saved: "{n} програм", applying_n: "{n} подаюсь",
 
       s_login: "Вхід", f_email: "Пошта", f_pw: "Пароль", pw_change: "Новий пароль",
@@ -79,7 +82,7 @@
       title_profile: "Profile", title_saved: "Saved", title_deadlines: "Deadlines", title_data: "Data & security",
       lede_profile: "Every field here does something: which deadline is yours, whether your scores are enough, and where the search starts from. Empty fields break nothing — you just get fewer answers.",
       lede_saved: "Not a filter on the results: a working list of where you are with each programme and what you worked out about it.",
-      lede_deadlines: "Only programmes you asked to be reminded about. Your date is highlighted; the others stay visible, because showing only yours is dangerous if the profile is wrong.",
+      lede_deadlines: "Everything you saved, by date. We show the date that applies to you: where a page states separate deadlines for EU and non-EU, your citizenship decides which. Where it states no groups, the nearest shared one.",
       lede_data: "Everything we hold about you, in one file you can keep — or erase for good.",
       back: "← Back to search", since: "since {d}", plan_free: "Free plan", plan_pro: "Pro",
 
@@ -111,7 +114,10 @@
       note_saving: "Saving…", note_saved: "Saved",
       sort_deadline: "Nearest deadline first", sort_added: "Most recently added first",
       empty_saved: "Nothing here yet — hit ★ on any programme.",
-      empty_watch: "You're not following any deadline yet. The reminder button is on the programme card.",
+      empty_watch: "Nothing here. Save a programme with the heart and its deadline shows up.",
+      no_date: "The official page states no application date.",
+      who_hint: "We don't know your citizenship, so this is the nearest date of all of them.",
+      who_hint_go: "Set it in the profile",
       count_saved: "{n} programmes", applying_n: "{n} applying",
 
       s_login: "Sign-in", f_email: "E-mail", f_pw: "Password", pw_change: "New password",
@@ -275,7 +281,7 @@
     who.appendChild(el("span", "ac-plan", u.plan === "pro" ? T("plan_pro") : T("plan_free")));
     nav.appendChild(who);
 
-    [["profile", null], ["saved", A.savedUids().length], ["deadlines", A.watchedUids().length], ["data", null]]
+    [["profile", null], ["saved", A.savedUids().length], ["deadlines", A.savedUids().length], ["data", null]]
       .forEach(function (pair) {
         var b = el("button", "ac-nav", T("title_" + pair[0]));
         b.type = "button";
@@ -642,25 +648,42 @@
 
   /* ---------- deadlines ---------- */
 
+  /* Every saved programme, by date, with the date that belongs to this reader.
+   *
+   * Saving used to do nothing here: deadlines came from a separate "remind me"
+   * button, so a list of hearted programmes and a list of dates were two lists
+   * to keep by hand. A heart already means "this one matters to me" — the date
+   * follows from it.
+   *
+   * Which date is a question about the reader, not the programme. The profile
+   * says which group they are in, ownDeadlines() keeps only the dates for that
+   * group, and where a programme states no group — or we do not know theirs —
+   * the whole set stays and the nearest is shown. Nothing is ever hidden for
+   * being someone else's date, and nothing is ever labelled "yours" on a guess.
+   *
+   * Programmes whose page states no date at all are listed too, saying so.
+   * Dropping them would turn "the source does not say" into "there is nothing
+   * to apply for", which is the one thing this product must not do.
+   */
   function paintDeadlines(main) {
-    var uids = A.watchedUids();
+    var uids = A.savedUids();
     var box = pane(main, null, null);
     if (!uids.length) { box.appendChild(el("div", "ac-empty", T("empty_watch"))); return; }
 
     withPrograms(uids, function (rows) {
       box.innerHTML = "";
-      var lines = [];
+      var known = A.user() && A.user().profile && A.user().profile.citizenship;
+      var dated = [], undated = [];
+
       rows.forEach(function (row) {
         var own = P().ownDeadlines ? P().ownDeadlines(row.deadlines) : row.deadlines;
         var next = P().nextDeadline ? P().nextDeadline(own) : null;
-        if (!next) return;
-        lines.push({ row: row, d: next, mine: P().isMyDeadline ? P().isMyDeadline(next) : false });
+        if (next) dated.push({ row: row, d: next, mine: !!known && P().isMyDeadline && P().isMyDeadline(next) });
+        else undated.push(row);
       });
-      lines.sort(function (a, b) { return a.d.days - b.d.days; });
+      dated.sort(function (a, b) { return a.d.days - b.d.days; });
 
-      if (!lines.length) { box.appendChild(el("div", "ac-empty", T("empty_watch"))); return; }
-
-      lines.forEach(function (line) {
+      dated.forEach(function (line) {
         var r = el("div", "ac-dl" + (line.mine ? " mine" : ""));
         var when = el("div", "when");
         when.appendChild(el("b", null, P().dateLabel(line.d)));
@@ -670,12 +693,40 @@
         body.appendChild(el("div", "t", line.row.title));
         var where = P().countryName ? P().countryName(line.row.country) : line.row.country;
         body.appendChild(el("div", "s", [line.row.university, where].filter(Boolean).join(" · ")));
-        if (line.mine && line.d.applies_to) {
-          body.appendChild(el("span", "ac-who-tag", P().deadlineWho(line.d.applies_to)));
+        // Whose date this is, said out loud whenever the page said it. "For
+        // everyone" is information too: it means there is no separate date to
+        // miss.
+        if (line.d.applies_to) {
+          body.appendChild(el("span", "ac-who-tag" + (line.mine ? "" : " plain"),
+                              P().deadlineWho(line.d.applies_to)));
         }
         r.appendChild(body);
         box.appendChild(r);
       });
+
+      undated.forEach(function (row) {
+        var r = el("div", "ac-dl undated");
+        var when = el("div", "when");
+        when.appendChild(el("b", null, "—"));
+        r.appendChild(when);
+        var body = el("div", "body");
+        body.appendChild(el("div", "t", row.title));
+        body.appendChild(el("div", "s", T("no_date")));
+        r.appendChild(body);
+        box.appendChild(r);
+      });
+
+      // The profile is what turns "a date" into "your date", and this is the
+      // moment that is worth saying — with the field one click away.
+      if (!known && dated.length) {
+        var hint = el("div", "ac-dl-hint");
+        hint.appendChild(document.createTextNode(T("who_hint") + " "));
+        var go = el("button", "ac-quiet", T("who_hint_go"));
+        go.type = "button";
+        go.onclick = function () { open("profile"); };
+        hint.appendChild(go);
+        box.appendChild(hint);
+      }
     }, box);
   }
 

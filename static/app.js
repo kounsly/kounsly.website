@@ -105,6 +105,9 @@
       freeonly: "Лише без плати за навчання", reset: "Скинути фільтри", sortlabel: "Сортування",
       sort_match: "За релевантністю", sort_tuition: "Найдешевші", sort_deadline: "Дедлайн найближче", sort_ielts: "Найнижчий IELTS",
       footer: "Kounsly — підбір англомовних програм за кордоном. Кожен факт має джерело й дату перевірки.",
+      f_product: "Продукт", f_search: "Пошук", f_saved: "Збережені", f_profile: "Профіль",
+      f_legal: "Правове", f_terms: "Умови користування", f_privacy: "Політика приватності",
+      f_contact: "Звʼязок", f_rights: "Усі права застережено.",
       found: "знайдено", of_total: "з", programmes: "програм",
       read_as: "Зрозуміла так:", read_off: "шукати дослівно",
       dl_everyone: "для всіх", dl_non_eu: "для не-ЄС", dl_eu_eea: "для громадян ЄС/ЄЕЗ",
@@ -169,6 +172,9 @@
       freeonly: "No tuition only", reset: "Reset filters", sortlabel: "Sort",
       sort_match: "Best match", sort_tuition: "Lowest tuition", sort_deadline: "Deadline soonest", sort_ielts: "Lowest IELTS",
       footer: "Kounsly — English-taught degrees abroad. Every fact carries its source and the date we checked it.",
+      f_product: "Product", f_search: "Search", f_saved: "Saved", f_profile: "Profile",
+      f_legal: "Legal", f_terms: "Terms of use", f_privacy: "Privacy policy",
+      f_contact: "Contact", f_rights: "All rights reserved.",
       found: "found", of_total: "of", programmes: "programmes",
       read_as: "Read as:", read_off: "search literally",
       dl_everyone: "for everyone", dl_non_eu: "for non-EU", dl_eu_eea: "for EU/EEA citizens",
@@ -800,9 +806,31 @@
     application_deadline_raw: "application_deadline_uk"
   };
 
+  /* Some translated fields arrive with the machinery still in them: a line
+   * reading "admission_requirements_raw:" sitting in the middle of the Ukrainian
+   * description, because the translation step was handed several fields at once
+   * with their column names as separators and kept the separators. The
+   * catalogue is the place to fix that, and it is fixed there too — but a
+   * reader should not be shown a column name while a rebuild is pending, and
+   * the same thing will happen again the next time a field is batched.
+   *
+   * Only lines that are nothing but a snake_case identifier and a colon go.
+   * The underscore is what makes it safe: no sentence in either language is a
+   * lone lowercase word with an underscore in it. */
+  var FIELD_MARKER = /^[ \t]*[a-z][a-z0-9]*(?:_[a-z0-9]+)+[ \t]*:[ \t]*$/;
+
+  function stripFieldMarkers(s) {
+    if (!s || s.indexOf("_") === -1) return s;
+    return s.split("\n")
+      .filter(function (line) { return !FIELD_MARKER.test(line); })
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
   function txt(p, field) {
-    if (lang === "uk" && UK_FIELD[field] && p[UK_FIELD[field]]) return p[UK_FIELD[field]];
-    return p[field];
+    var value = (lang === "uk" && UK_FIELD[field] && p[UK_FIELD[field]]) ? p[UK_FIELD[field]] : p[field];
+    return typeof value === "string" ? stripFieldMarkers(value) : value;
   }
 
   /** Source prose carries bare URLs and e-mail addresses ("purchased for 95 EUR:

@@ -1014,6 +1014,22 @@ def health() -> dict[str, Any]:
             "assistant": assistant_available(), "accounts": auth.accounts_available()}
 
 
+LEGAL = ROOT / "legal.html"
+
+
+@app.get("/terms")
+@app.get("/privacy")
+def legal() -> FileResponse:
+    """Terms and the privacy policy — two real addresses, one file.
+
+    Real addresses because they are linked from the sign-in box and will be
+    handed to a payment provider, and neither a hash nor a modal is something
+    you can put in a form. One file because they share a header, a footer and
+    every style, and the page decides which of the two to show from the path.
+    """
+    return FileResponse(LEGAL, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/")
 def index() -> FileResponse:
     # no-store: the page shipped stale once already and cost hours of confusion

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kounsly — умови й приватність</title>
+<meta name="robots" content="index,follow">
+</head>
+<body>
+<style>
+/* Tokens repeated from index.html rather than shared, on purpose: this page
+   loads no fonts and no application CSS, because it has to render for someone
+   who arrived from a payment provider's checklist, on a bad connection, with
+   the rest of the site not yet in cache. Keep the values in step by hand — they
+   are eleven lines and they change roughly never. */
+:root{
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --bg:#F7F8FC; --panel:#FFFFFF; --panel-2:#F1F2F8;
+  --text:#181A24; --muted:#585C6E; --faint:#8A8FA3;
+  --brd:#E6E8F1; --brd-2:#D6D9E6;
+  --accent:#5B57E8; --accent-ink:#4642CE; --accent-soft:#EEEDFD;
+  --warn:#946110; --warn-soft:#FBF1DD;
+  --shadow:0 1px 2px rgba(24,26,40,.04), 0 10px 26px -16px rgba(24,26,40,.22);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0A0B11; --panel:rgba(255,255,255,.05); --panel-2:rgba(255,255,255,.08);
+    --text:#ECEEF7; --muted:#A2A6BC; --faint:#6C7189;
+    --brd:rgba(255,255,255,.09); --brd-2:rgba(255,255,255,.17);
+    --accent:#8A86FF; --accent-ink:#A9A5FF; --accent-soft:rgba(124,116,240,.15);
+    --warn:#E0A64B; --warn-soft:rgba(224,166,75,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 30px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A0B11; --panel:rgba(255,255,255,.05); --panel-2:rgba(255,255,255,.08);
+  --text:#ECEEF7; --muted:#A2A6BC; --faint:#6C7189;
+  --brd:rgba(255,255,255,.09); --brd-2:rgba(255,255,255,.17);
+  --accent:#8A86FF; --accent-ink:#A9A5FF; --accent-soft:rgba(124,116,240,.15);
+  --warn:#E0A64B; --warn-soft:rgba(224,166,75,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 30px -18px rgba(0,0,0,.8);
+}
+:root[data-theme="light"]{
+  --bg:#F7F8FC; --panel:#FFFFFF; --panel-2:#F1F2F8;
+  --text:#181A24; --muted:#585C6E; --faint:#8A8FA3;
+  --brd:#E6E8F1; --brd-2:#D6D9E6;
+  --accent:#5B57E8; --accent-ink:#4642CE; --accent-soft:#EEEDFD;
+  --warn:#946110; --warn-soft:#FBF1DD;
+  --shadow:0 1px 2px rgba(24,26,40,.04), 0 10px 26px -16px rgba(24,26,40,.22);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+header.top{position:sticky;top:0;z-index:10;
+  background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--brd)}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+.top .wrap{display:flex;align-items:center;height:58px;gap:14px}
+.brand{font-weight:800;font-size:20px;letter-spacing:-.03em;text-decoration:none;color:var(--text)}
+.top nav{margin-left:auto;display:flex;gap:16px;font-size:14px}
+.top nav a{color:var(--muted);text-decoration:none;font-weight:600}
+.top nav a:hover,.top nav a[aria-current="page"]{color:var(--accent-ink)}
+
+main{padding:36px 0 80px}
+h1{font-size:clamp(26px,4vw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:0 0 6px}
+.updated{color:var(--faint);font-size:13px;font-family:var(--mono);margin:0 0 28px}
+h2{font-size:19px;font-weight:700;letter-spacing:-.015em;margin:34px 0 8px;scroll-margin-top:70px}
+h3{font-size:16px;font-weight:700;margin:20px 0 6px}
+p,li{color:var(--text)}
+p{margin:0 0 12px}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:4px 0}
+.lede{color:var(--muted);font-size:16.5px;margin-bottom:26px}
+.tabs{display:flex;gap:8px;margin:0 0 28px;flex-wrap:wrap}
+.tab{padding:8px 15px;border-radius:999px;border:1px solid var(--brd-2);background:var(--panel);
+  color:var(--text);font:inherit;font-size:14px;font-weight:600;text-decoration:none}
+.tab[aria-current="page"]{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
+.doc{display:none}
+.doc:target,.doc.on{display:block}
+.box{background:var(--panel);border:1px solid var(--brd);border-radius:14px;
+  padding:16px 18px;box-shadow:var(--shadow);margin:0 0 18px}
+.todo{background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);
+  border-radius:12px;padding:14px 16px;margin:0 0 20px;font-size:14.5px;line-height:1.6}
+.todo b{color:var(--warn)}
+.fill{font-family:var(--mono);font-size:.9em;background:var(--warn-soft);color:var(--warn);
+  border-radius:5px;padding:1px 6px}
+footer{border-top:1px solid var(--brd);padding:22px 0 40px;color:var(--faint);font-size:13px}
+footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+footer .sp{flex:1}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Kounsly</a>
+    <nav>
+      <a href="/">Пошук</a>
+      <a href="/terms">Умови</a>
+      <a href="/privacy">Приватність</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="tabs">
+    <a class="tab" href="/terms" id="tab-terms">Умови користування</a>
+    <a class="tab" href="/privacy" id="tab-privacy">Політика приватності</a>
+  </div>
+
+  <div class="todo">
+    <b>Чернетка.</b> Текст нижче написаний під те, як Kounsly працює насправді, але
+    його треба вичитати перед тим, як подавати документи в платіжного провайдера.
+    Місця, які я не мала права вигадувати, позначені так: <span class="fill">ЗАПОВНИТИ</span> —
+    це юридична особа, країна реєстрації, адреса й пошта для звернень. Без них
+    документ не має сили, а платіжний провайдер їх однаково запитає.
+  </div>
+
+  <!-- ================= УМОВИ ================= -->
+  <section class="doc" id="terms">
+    <h1>Умови користування</h1>
+    <p class="updated">Чинні з <span class="fill">ЗАПОВНИТИ ДАТУ</span></p>
+
+    <p class="lede">Коротко: Kounsly показує програми університетів із їхніх офіційних
+      сторінок і не бере участі у вступі. Ми не агент, не посередник і не даємо гарантій
+      вступу. Рішення ухвалює університет.</p>
+
+    <h2 id="who">1. Хто надає послугу</h2>
+    <p>Сервіс Kounsly (сайт kounsly.com) надає <span class="fill">ЗАПОВНИТИ: назва юридичної особи або ФОП</span>,
+      зареєстрована(ий) у <span class="fill">ЗАПОВНИТИ: країна</span>,
+      адреса <span class="fill">ЗАПОВНИТИ: адреса</span>,
+      пошта для звернень <span class="fill">ЗАПОВНИТИ: пошта</span> (далі — «ми»).</p>
+
+    <h2 id="what">2. Що таке Kounsly</h2>
+    <p>Kounsly — це каталог навчальних програм за кордоном із пошуком і асистентом,
+      який відповідає на питання про конкретну програму. Дані про програми ми збираємо
+      з офіційних джерел — сторінок університетів і публічних баз, зокрема DAAD, — і
+      під кожним фактом указуємо джерело та дату перевірки.</p>
+    <ul>
+      <li>Ми не подаємо заявки, не представляємо вас перед університетом і не беремо комісій із вступу.</li>
+      <li>Ми не гарантуємо вступ, стипендію, візу чи будь-який інший результат.</li>
+      <li>Ми не змінюємо вимог університету й не тлумачимо їх на вашу користь.</li>
+    </ul>
+
+    <h2 id="accuracy">3. Точність даних</h2>
+    <p>Ми показуємо те, що написано на офіційній сторінці програми, і прямо кажемо
+      «не вказано», коли даних немає. Але сторінки університетів змінюються, а між
+      перевірками минає час. Тому:</p>
+    <ul>
+      <li>Остаточним джерелом завжди є офіційна сторінка програми — посилання на неї є в кожній картці.</li>
+      <li>Перед подачею документів звіряйте дедлайн, вартість і вимоги на сайті університету.</li>
+      <li>Ми не несемо відповідальності за рішення, ухвалені виключно на підставі даних із Kounsly без такої звірки.</li>
+    </ul>
+
+    <h2 id="assistant">4. Асистент</h2>
+    <p>Асистент відповідає лише за даними тієї програми, яку ви відкрили, і не має
+      доступу до зовнішніх джерел під час відповіді. Якщо факту немає у даних програми,
+      він так і каже, а не припускає. Попри це, відповідь генерує мовна модель, і вона
+      може помилятися — ставтеся до неї як до довідки, а не як до консультації.</p>
+    <p>Кількість питань обмежена: без акаунта — кілька на пристрій, з безкоштовним
+      акаунтом — місячна норма. Обмеження існує тому, що кожна відповідь коштує нам грошей.</p>
+
+    <h2 id="account">5. Акаунт</h2>
+    <ul>
+      <li>Акаунт потрібен, щоб зберігати програми, вести нотатки й бачити свої дедлайни.</li>
+      <li>Один акаунт — одна людина. Не передавайте доступ і не створюйте акаунти автоматично.</li>
+      <li>Ви відповідаєте за збереження доступу до своєї пошти, бо через неї відновлюється вхід.</li>
+      <li>Видалити акаунт можна самостійно в розділі «Дані й безпека». Видалення незворотне.</li>
+    </ul>
+
+    <h2 id="payments">6. Оплата</h2>
+    <p class="fill" style="display:block;padding:12px 14px;border-radius:10px">
+      ЗАПОВНИТИ, коли з'явиться платний план: що саме входить, ціна й валюта, період
+      оплати й автопродовження, як скасувати, умови повернення коштів, хто є продавцем
+      (ми чи merchant of record), і що стається з даними після скасування.
+    </p>
+    <p>Поки платних планів немає, цей розділ не застосовується.</p>
+
+    <h2 id="rules">7. Чого не можна робити</h2>
+    <ul>
+      <li>Викачувати каталог автоматично, обходити обмеження на кількість запитів, навантажувати сервіс.</li>
+      <li>Перепродавати наші дані або видавати їх за свої.</li>
+      <li>Використовувати асистента для чогось, що не стосується вступу на програму.</li>
+    </ul>
+
+    <h2 id="liability">8. Відповідальність</h2>
+    <p>Сервіс надається «як є». У межах, дозволених законом, ми не відповідаємо за
+      непрямі збитки — зокрема за пропущений дедлайн, відмову у вступі, витрати на
+      подачу документів чи візу. Це не обмежує ваших прав споживача, якщо законодавство
+      вашої країни надає більший захист.</p>
+
+    <h2 id="changes">9. Зміни умов</h2>
+    <p>Ми можемо змінювати ці умови. Дата вгорі показує чинну редакцію; про суттєві
+      зміни попередимо на пошту, вказану в акаунті.</p>
+
+    <h2 id="law">10. Право й спори</h2>
+    <p>До цих умов застосовується право <span class="fill">ЗАПОВНИТИ: країна</span>.
+      Спершу напишіть нам на <span class="fill">ЗАПОВНИТИ: пошта</span> — більшість
+      питань вирішується листом.</p>
+  </section>
+
+  <!-- ================= ПРИВАТНІСТЬ ================= -->
+  <section class="doc" id="privacy">
+    <h1>Політика приватності</h1>
+    <p class="updated">Чинна з <span class="fill">ЗАПОВНИТИ ДАТУ</span></p>
+
+    <p class="lede">Коротко: без акаунта ми не знаємо, хто ви. З акаунтом зберігаємо
+      те, що ви самі ввели, і те, що ви зберегли. Забрати чи стерти все можна самостійно.</p>
+
+    <h2 id="controller">1. Хто відповідає за дані</h2>
+    <p>Володілець даних — <span class="fill">ЗАПОВНИТИ: назва юридичної особи або ФОП</span>,
+      <span class="fill">ЗАПОВНИТИ: адреса</span>. Питання про дані —
+      на <span class="fill">ЗАПОВНИТИ: пошта</span>.</p>
+
+    <h2 id="what-we-keep">2. Що ми зберігаємо</h2>
+    <h3>Без акаунта</h3>
+    <ul>
+      <li>Анонімний ідентифікатор у вашому браузері — щоб рахувати безкоштовні питання до асистента.</li>
+      <li>Технічні записи сервера (IP, час запиту) — для захисту від зловживань.</li>
+      <li>Ваші пошукові запити <b>не зберігаються</b>, поки ви не увійшли.</li>
+    </ul>
+    <h3>З акаунтом</h3>
+    <ul>
+      <li>Пошта — вона ж спосіб входу.</li>
+      <li>Профіль: громадянство, статус, освіта, спеціальність, бали, мовні сертифікати,
+        бажаний рік і рівень вступу, стеля плати. Усе це вводите ви, і будь-яке поле можна лишити порожнім.</li>
+      <li>Збережені програми, ваші нотатки до них і позначки «подаюсь / думаю / відпало».</li>
+      <li>Історія пошуку — фрази, які ви шукали, щоб можна було до них повернутися.</li>
+      <li>Лічильник питань до асистента. Самі питання ми не зберігаємо.</li>
+    </ul>
+
+    <h2 id="why">3. Навіщо</h2>
+    <ul>
+      <li>Щоб показати дедлайн, який стосується саме вас, а не загальний.</li>
+      <li>Щоб сказати, чи вистачає ваших балів під вимоги програми.</li>
+      <li>Щоб ваш список був однаковий на телефоні й на комп'ютері.</li>
+      <li>Щоб рахувати безкоштовну норму питань.</li>
+    </ul>
+    <p>Підстава обробки — виконання договору з вами (надання сервісу) та наш законний
+      інтерес у захисті сервісу від зловживань.</p>
+
+    <h2 id="assistant-data">4. Асистент і ваші дані</h2>
+    <p>Коли ви ставите питання, до моделі йде текст питання, дані відкритої програми
+      і частина профілю — громадянство, статус, рівень освіти, мовні бали, спеціальність.
+      Середній бал моделі <b>не передається</b>. Обробку виконує Google (Vertex AI);
+      ці дані не використовуються для навчання моделі.</p>
+
+    <h2 id="processors">5. Кому ми передаємо дані</h2>
+    <ul>
+      <li><b>Supabase</b> — вхід в акаунт і база даних користувачів.</li>
+      <li><b>Google Cloud (Vertex AI)</b> — обробка питань до асистента.</li>
+      <li><b>Hetzner / Coolify</b> <span class="fill">ЗВІРИТИ ХОСТИНГ</span> — сервер, на якому працює сайт.</li>
+      <li>Якщо ви входите через Google або Apple — вони підтверджують вашу особу; пароль ми не бачимо ніколи.</li>
+    </ul>
+    <p>Ми не продаємо дані, не передаємо їх рекламним мережам і не надсилаємо розсилок,
+      на які ви не підписувалися. Аналітики зі стеженням на сайті немає.</p>
+
+    <h2 id="how-long">6. Скільки зберігаємо</h2>
+    <p>Поки існує акаунт. Видалите акаунт — профіль, збережені, нотатки, дедлайни й
+      історія зникають остаточно, без резервної копії для відновлення.
+      Ваша адреса лишається в системі входу Supabase, але за нею не буде жодних даних.</p>
+
+    <h2 id="rights">7. Ваші права</h2>
+    <ul>
+      <li><b>Подивитися</b> — усе, що ми зберігаємо, видно в акаунті.</li>
+      <li><b>Виправити</b> — будь-яке поле профілю редагується там само.</li>
+      <li><b>Видалити</b> — кнопка в розділі «Дані й безпека».</li>
+      <li><b>Отримати копію</b> — напишіть нам, і ми вивантажимо ваші дані файлом.</li>
+      <li><b>Поскаржитися</b> — до наглядового органу з захисту даних у вашій країні.</li>
+    </ul>
+
+    <h2 id="cookies">8. Cookies</h2>
+    <p>Рекламних і аналітичних cookies немає. У браузері зберігаються: сесія входу,
+      обрана мова й тема, анонімний лічильник питань. Без них сайт не працюватиме як слід.</p>
+
+    <h2 id="children">9. Діти</h2>
+    <p>Сервіс розрахований на людей, які вступають до університету. Якщо вам менше
+      <span class="fill">ЗАПОВНИТИ: 16 або 18, залежно від країни</span> років, користуйтеся
+      сервісом за згодою батьків.</p>
+
+    <h2 id="privacy-changes">10. Зміни</h2>
+    <p>Дата вгорі показує чинну редакцію. Про суттєві зміни попередимо на пошту.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© Kounsly</span>
+    <a href="/">Пошук</a>
+    <a href="/terms">Умови</a>
+    <a href="/privacy">Приватність</a>
+    <span class="sp"></span>
+    <span>Кожен факт має джерело й дату перевірки.</span>
+  </div>
+</footer>
+
+<script>
+  /* One file, two documents: they share a header, a footer and every style, and
+     splitting them into two pages would mean maintaining that twice. The path
+     decides which one is shown, so /terms and /privacy stay real, linkable,
+     indexable addresses — a payment provider's reviewer will open them
+     directly, and an anchor inside one still scrolls to its heading. */
+  (function () {
+    var which = location.pathname.indexOf("privacy") > -1 ? "privacy" : "terms";
+    document.getElementById(which).classList.add("on");
+    var tab = document.getElementById("tab-" + which);
+    if (tab) tab.setAttribute("aria-current", "page");
+    document.querySelectorAll(".top nav a").forEach(function (a) {
+      if (a.getAttribute("href") === "/" + which) a.setAttribute("aria-current", "page");
+    });
+    document.title = "Kounsly — " + (which === "privacy" ? "політика приватності" : "умови користування");
+    var theme = localStorage.getItem("kounsly.theme");
+    if (theme) document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+</body>
+</html>

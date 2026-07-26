@@ -225,6 +225,18 @@
   display:inline-block;margin-top:6px;font-size:11px;text-transform:uppercase;
   letter-spacing:.06em;color:var(--accent-ink);font-weight:700;
 }
+/* Whose date it is, said even when it is not specifically the reader's — "for
+   everyone" is information: it means there is no second date to miss. */
+.ac-who-tag.plain{ color:var(--faint) }
+/* A programme whose page states no date. Listed, not dropped: silence here
+   would read as "nothing to apply for". */
+.ac-dl.undated{ opacity:.75 }
+.ac-dl.undated .when b{ color:var(--faint) }
+.ac-dl-hint{
+  margin-top:14px;padding:11px 13px;border-left:3px solid var(--warn);
+  background:var(--panel-2);border-radius:0 8px 8px 0;
+  font-size:.85rem;line-height:1.55;color:var(--muted);
+}
 
 /* ---------- questions left ---------- */
 .ac-bar{ height:9px;border-radius:999px;background:var(--panel-2);overflow:hidden;margin:14px 0 9px }

@@ -58,7 +58,7 @@
       pw_new_t: "Новий пароль", pw_new_b: "Придумай новий пароль — і одразу ним увійдеш.",
       pw_new_ph: "Новий пароль", pw_new_save: "Зберегти",
       pw_changed: "Пароль змінено.",
-      legal: "Входячи, ти погоджуєшся з умовами. Ми не продаємо дані й не надсилаємо спам.",
+      legal: "Входячи, ти погоджуєшся з {terms}.", legal_terms: "умовами",
       err_email: "Схоже, це не пошта.", err_code: "Код не підійшов. Спробуй ще раз.",
       err_pw_short: "Пароль має бути щонайменше 8 символів.",
       err_pw_wrong: "Пошта або пароль не підходять.",
@@ -103,7 +103,7 @@
       pw_new_t: "New password", pw_new_b: "Pick a new one and you're signed in with it.",
       pw_new_ph: "New password", pw_new_save: "Save",
       pw_changed: "Password changed.",
-      legal: "By signing in you accept the terms. We don't sell data and we don't send spam.",
+      legal: "By signing in you accept the {terms}.", legal_terms: "terms",
       err_email: "That doesn't look like an e-mail.", err_code: "That code didn't work. Try again.",
       err_pw_short: "A password needs at least 8 characters.",
       err_pw_wrong: "That e-mail and password don't match.",
@@ -478,7 +478,14 @@
         '<p class="gate-lede">' + esc(body) + "</p>" +
         '<div class="gate-choices">' + buttons + "</div>" +
         '<div class="gate-step" id="gate-step"></div>' +
-        '<p class="gate-legal">' + esc(T("legal")) + "</p>" +
+        // The terms are a link, not a word: promising "we don't sell data" in a
+        // sentence nobody can click is a claim with nothing behind it. The page
+        // it points at is where that promise is actually made, and where a
+        // payment provider will look for it.
+        '<p class="gate-legal">' +
+          esc(T("legal")).replace("{terms}",
+            '<a href="/terms" target="_blank" rel="noopener">' + esc(T("legal_terms")) + "</a>") +
+        "</p>" +
       "</div>";
 
     g.classList.add("open");
@@ -933,7 +940,9 @@
           // lists below it are ways into the same account page.
           '<button data-act="profile">' + esc(T("profile")) + "</button>" +
           '<button data-act="saved">' + esc(T("saved_list")) + '<span class="n">' + me.saved.length + "</span></button>" +
-          '<button data-act="deadlines">' + esc(T("deadlines_list")) + '<span class="n">' + (me.watched || []).length + "</span></button>" +
+          // No number: every saved programme has a place in the deadlines view
+          // now, so it would be the same figure twice in one menu.
+          '<button data-act="deadlines">' + esc(T("deadlines_list")) + "</button>" +
           '<div class="acct-sep"></div>' +
           // No "new password" here any more. Changing one is account admin, it
           // lives in the account page under data & security — including for
