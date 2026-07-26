@@ -805,9 +805,15 @@ class UidsIn(BaseModel):
     uids: list[str] = Field(default_factory=list, max_length=200)
 
 
+class ChecklistItem(BaseModel):
+    text: str = Field("", max_length=auth.CHECK_MAX_TEXT)
+    done: bool = False
+
+
 class SavedNoteIn(BaseModel):
     note: Optional[str] = Field(None, max_length=auth.NOTE_MAX)
     state: Optional[str] = None
+    checklist: Optional[list[ChecklistItem]] = Field(None, max_length=auth.CHECK_MAX_ITEMS)
 
 
 def signed_in(request: Request) -> dict[str, Any]:
@@ -925,7 +931,7 @@ def annotate_saved(uid: str, body: SavedNoteIn, request: Request) -> dict[str, A
     controls, and sending one must not blank the other.
     """
     user = signed_in(request)
-    auth.annotate_saved(user["id"], uid, body.model_dump(exclude_unset=True))
+    auth.annotate_saved(user["id"], uid, body.model_dump(exclude_unset=True))  # pydantic → plain dicts
     return me_payload(user, request)
 
 

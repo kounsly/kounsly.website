@@ -42,6 +42,8 @@
       g_ask_b: "З акаунтом — {n} питань щомісяця, безкоштовно.",
       g_profile_t: "Щоб показати саме твій дедлайн",
       g_profile_b: "Дати різні для громадян ЄС і для всіх інших. Скажи, хто ти — і побачиш свою.",
+      g_signup_t: "Створи акаунт", g_signup_b: "Збережені програми з нотатками, твої дедлайни й більше питань до асистента.",
+      signup: "Зареєструватися",
       g_default_t: "Увійди в Kounsly",
       g_default_b: "Збережені програми, нагадування про дедлайни й більше питань до асистента.",
       with_google: "Продовжити з Google", with_apple: "Продовжити з Apple",
@@ -87,6 +89,8 @@
       g_ask_b: "An account gets you {n} questions a month, free.",
       g_profile_t: "To show the deadline that is actually yours",
       g_profile_b: "Dates differ for EU citizens and everyone else. Tell us who you are and you'll see yours.",
+      g_signup_t: "Create an account", g_signup_b: "Saved programmes with notes, your deadlines, and more questions for the assistant.",
+      signup: "Sign up",
       g_default_t: "Sign in to Kounsly",
       g_default_b: "Saved programmes, deadline reminders, and more questions for the assistant.",
       with_google: "Continue with Google", with_apple: "Continue with Apple",
@@ -430,6 +434,7 @@
     watch: ["g_watch_t", "g_watch_b"],
     ask: ["g_ask_t", "g_ask_b"],
     profile: ["g_profile_t", "g_profile_b"],
+    signup: ["g_signup_t", "g_signup_b"],
     "default": ["g_default_t", "g_default_b"]
   };
 
@@ -920,8 +925,14 @@
     if (!cfg.enabled) { slot.innerHTML = ""; return; }
 
     if (!me) {
-      slot.innerHTML = '<button class="signin" id="signinbtn">' + esc(T("signin")) + "</button>";
+      // Two buttons, not one. "Sign in" is for the person who has been here
+      // before; everyone else needs to be told they can start. One button
+      // saying "Sign in" reads as "members only" to someone who is neither.
+      slot.innerHTML =
+        '<button class="signin" id="signinbtn">' + esc(T("signin")) + "</button>" +
+        '<button class="signup" id="signupbtn">' + esc(T("signup")) + "</button>";
       document.getElementById("signinbtn").onclick = function () { openGate("default", null); };
+      document.getElementById("signupbtn").onclick = function () { openGate("signup", null); };
       return;
     }
 

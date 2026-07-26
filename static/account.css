@@ -209,6 +209,52 @@
 .ac-note[readonly]{ background:transparent;border-color:transparent;border-left-color:var(--warn);cursor:text }
 .ac-saving{ font-size:12px;color:var(--faint);align-self:center }
 
+/* ---------- the application checklist ---------- */
+.ac-check{ margin-top:10px;border-top:1px dashed var(--brd);padding-top:11px }
+.ac-check-head{ display:flex;align-items:center;gap:12px;flex-wrap:wrap }
+.ac-check-n{ font-size:12.5px;font-weight:650;color:var(--muted);white-space:nowrap }
+.ac-check-bar{ flex:1 1 90px;min-width:70px;height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden }
+.ac-check-bar i{ display:block;height:100%;background:var(--good);border-radius:999px;transition:width .18s ease }
+@media (prefers-reduced-motion:reduce){ .ac-check-bar i{ transition:none } }
+.ac-portal{
+  font-size:12.5px;font-weight:650;color:var(--accent-ink);text-decoration:none;
+  border:1px solid var(--brd-2);border-radius:999px;padding:4px 11px;white-space:nowrap;
+}
+.ac-portal:hover{ border-color:var(--accent);background:var(--accent-soft) }
+.ac-check-list{ display:flex;flex-direction:column;gap:2px;margin-top:9px }
+.ac-check-item{
+  display:flex;align-items:flex-start;gap:9px;padding:6px 6px 6px 0;border-radius:8px;
+  font-size:13.5px;line-height:1.45;cursor:pointer;
+}
+.ac-check-item:hover{ background:var(--panel-2) }
+.ac-check-item input{ position:absolute;opacity:0;width:0;height:0 }
+.ac-check-item .tick{
+  flex:none;width:18px;height:18px;margin-top:1px;border-radius:6px;
+  border:1.5px solid var(--brd-2);background:var(--panel);
+  display:grid;place-items:center;color:transparent;font-size:11px;line-height:1;
+}
+.ac-check-item input:checked + .tick{ background:var(--good);border-color:transparent;color:#fff }
+.ac-check-item input:focus-visible + .tick{ outline:2px solid var(--accent);outline-offset:2px }
+.ac-check-item .t{ flex:1;min-width:0;outline:none;border-radius:4px;padding:0 2px }
+.ac-check-item .t:focus{ background:var(--panel-2);box-shadow:0 0 0 2px var(--accent-soft) }
+.ac-check-item.done .t{ color:var(--faint);text-decoration:line-through }
+.ac-check-item .x{
+  flex:none;border:0;background:none;color:var(--faint);font-size:12px;line-height:1;
+  padding:2px 4px;cursor:pointer;opacity:0;
+}
+.ac-check-item:hover .x,.ac-check-item:focus-within .x{ opacity:1 }
+.ac-check-item .x:hover{ color:var(--warn) }
+@media (hover:none){ .ac-check-item .x{ opacity:1 } }
+.ac-check-add{
+  align-self:flex-start;border:0;background:none;padding:4px 2px;margin-top:2px;
+  color:var(--accent-ink);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+}
+.ac-check-add:hover{ text-decoration:underline }
+/* Until a person touches it, the list is our reading of the page, not theirs. */
+.ac-check.ac-seeded .ac-check-list::after{
+  content:attr(data-hint);display:block;margin-top:6px;font-size:11.5px;color:var(--faint);
+}
+
 /* ---------- deadlines ---------- */
 .ac-dl{ display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--brd) }
 .ac-dl:last-child{ border-bottom:0 }
@@ -232,6 +278,12 @@
    would read as "nothing to apply for". */
 .ac-dl.undated{ opacity:.75 }
 .ac-dl.undated .when b{ color:var(--faint) }
+.ac-dl-open{
+  display:inline-block;margin:9px 12px 0 0;border:0;background:none;padding:0;
+  color:var(--accent-ink);font:inherit;font-size:12.5px;font-weight:600;
+  cursor:pointer;text-decoration:none;
+}
+.ac-dl-open:hover{ text-decoration:underline }
 .ac-dl-hint{
   margin-top:14px;padding:11px 13px;border-left:3px solid var(--warn);
   background:var(--panel-2);border-radius:0 8px 8px 0;

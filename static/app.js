@@ -105,9 +105,8 @@
       freeonly: "Лише без плати за навчання", reset: "Скинути фільтри", sortlabel: "Сортування",
       sort_match: "За релевантністю", sort_tuition: "Найдешевші", sort_deadline: "Дедлайн найближче", sort_ielts: "Найнижчий IELTS",
       footer: "Kounsly — підбір англомовних програм за кордоном. Кожен факт має джерело й дату перевірки.",
-      f_product: "Продукт", f_search: "Пошук", f_saved: "Збережені", f_profile: "Профіль",
-      f_legal: "Правове", f_terms: "Умови користування", f_privacy: "Політика приватності",
-      f_contact: "Звʼязок", f_rights: "Усі права застережено.",
+      f_terms: "Умови користування", f_privacy: "Політика приватності",
+      f_help: "Потрібна допомога? Напиши нам", f_rights: "Усі права застережено.",
       found: "знайдено", of_total: "з", programmes: "програм",
       read_as: "Зрозуміла так:", read_off: "шукати дослівно",
       dl_everyone: "для всіх", dl_non_eu: "для не-ЄС", dl_eu_eea: "для громадян ЄС/ЄЕЗ",
@@ -172,9 +171,8 @@
       freeonly: "No tuition only", reset: "Reset filters", sortlabel: "Sort",
       sort_match: "Best match", sort_tuition: "Lowest tuition", sort_deadline: "Deadline soonest", sort_ielts: "Lowest IELTS",
       footer: "Kounsly — English-taught degrees abroad. Every fact carries its source and the date we checked it.",
-      f_product: "Product", f_search: "Search", f_saved: "Saved", f_profile: "Profile",
-      f_legal: "Legal", f_terms: "Terms of use", f_privacy: "Privacy policy",
-      f_contact: "Contact", f_rights: "All rights reserved.",
+      f_terms: "Terms of use", f_privacy: "Privacy policy",
+      f_help: "Need help? Write to us", f_rights: "All rights reserved.",
       found: "found", of_total: "of", programmes: "programmes",
       read_as: "Read as:", read_off: "search literally",
       dl_everyone: "for everyone", dl_non_eu: "for non-EU", dl_eu_eea: "for EU/EEA citizens",
@@ -1302,8 +1300,19 @@
 
   function bindTheme() {
     var tb = $("themebtn");
-    var saved = localStorage.getItem("kounsly.theme");
-    if (saved) root.setAttribute("data-theme", saved);
+    // The attribute is already set by the inline script in index.html; this
+    // only keeps it in step with the system for as long as nobody has chosen.
+    // Someone who has chosen keeps their choice — including when their phone
+    // switches at sunset.
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    var follow = function () {
+      if (localStorage.getItem("kounsly.theme")) return;
+      root.setAttribute("data-theme", mq.matches ? "dark" : "light");
+      paintTheme();
+    };
+    if (mq.addEventListener) mq.addEventListener("change", follow);
+    else if (mq.addListener) mq.addListener(follow);
+
     if (tb) tb.addEventListener("click", function () {
       var next = isDark() ? "light" : "dark";
       root.setAttribute("data-theme", next);
@@ -1401,6 +1410,7 @@
    * and the only way to guarantee that is for there to be one card renderer. */
   window.KounslyApp = {
     card: card,
+    openSheet: openSheet,
     ownDeadlines: ownDeadlines,
     nextDeadline: nextDeadline,
     isMyDeadline: isMyDeadline,

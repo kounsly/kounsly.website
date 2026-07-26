@@ -253,6 +253,32 @@ SAVED_STATES = {"applying", "thinking", "dropped"}
 NOTE_MAX = 2000
 
 
+CHECK_MAX_ITEMS = 30
+CHECK_MAX_TEXT = 200
+
+
+def clean_checklist(raw: Any) -> Optional[list[dict[str, Any]]]:
+    """Accept a checklist only in the shape we wrote it.
+
+    Every line is a person's own words about their own application, so the text
+    is kept as typed — trimmed and length-capped, not parsed. Anything that is
+    not a line with text is dropped rather than stored as an empty tick.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw[:CHECK_MAX_ITEMS]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()[:CHECK_MAX_TEXT]
+        if not text:
+            continue
+        out.append({"text": text, "done": bool(item.get("done"))})
+    return out
+
+
 def saved_rows(user_id: str) -> dict[str, dict[str, Any]]:
     """Everything the reader added to a saved programme, keyed by uid.
 
@@ -260,10 +286,11 @@ def saved_rows(user_id: str) -> dict[str, dict[str, Any]]:
     it are different questions, and the card view needs only the first.
     """
     rows = query(
-        "SELECT uid, note, state FROM saved_program WHERE user_id = %s ORDER BY created_at DESC",
+        "SELECT uid, note, state, checklist FROM saved_program WHERE user_id = %s ORDER BY created_at DESC",
         (user_id,),
     )
-    return {r["uid"]: {"note": r["note"] or "", "state": r["state"]} for r in rows}
+    return {r["uid"]: {"note": r["note"] or "", "state": r["state"],
+                       "checklist": r["checklist"]} for r in rows}
 
 
 def annotate_saved(user_id: str, uid: str, data: dict[str, Any]) -> None:
@@ -283,6 +310,12 @@ def annotate_saved(user_id: str, uid: str, data: dict[str, Any]) -> None:
             state = None
         sets.append("state = %s")
         params.append(state)
+    if "checklist" in data:
+        import json as _json
+
+        items = clean_checklist(data["checklist"])
+        sets.append("checklist = %s")
+        params.append(_json.dumps(items) if items else None)
     if not sets:
         return
     params += [user_id, uid]

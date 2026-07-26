@@ -343,6 +343,12 @@
 .ob-actions .ob-skip:hover{color:var(--text)}
 
 /* ---------- header ---------- */
+#authslot{display:flex;align-items:center;gap:8px}
+.signup{
+  padding:8px 15px;border-radius:10px;border:0;background:var(--grad);color:#fff;
+  font:inherit;font-size:.86rem;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+.signup:hover{filter:brightness(1.06)}
 .signin{
   padding:8px 15px;border-radius:10px;border:1px solid var(--brd-2);
   background:var(--panel);color:var(--text);font:inherit;font-size:.86rem;font-weight:600;cursor:pointer;

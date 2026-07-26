@@ -289,12 +289,11 @@ footer .sp{flex:1}
 
 <footer>
   <div class="wrap">
-    <span>© Kounsly</span>
-    <a href="/">Пошук</a>
+    <span>© 2026 Kounsly. Усі права застережено.</span>
+    <span class="sp"></span>
     <a href="/terms">Умови</a>
     <a href="/privacy">Приватність</a>
-    <span class="sp"></span>
-    <span>Кожен факт має джерело й дату перевірки.</span>
+    <a href="mailto:support@kounsly.com">support@kounsly.com</a>
   </div>
 </footer>
 
@@ -314,7 +313,8 @@ footer .sp{flex:1}
     });
     document.title = "Kounsly — " + (which === "privacy" ? "політика приватності" : "умови користування");
     var theme = localStorage.getItem("kounsly.theme");
-    if (theme) document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme",
+      theme ? theme : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   })();
 </script>
 </body>

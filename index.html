@@ -162,27 +162,28 @@
   .empty{background:var(--panel);border:1px solid var(--brd);border-radius:15px;padding:44px 24px;text-align:center;color:var(--muted);box-shadow:var(--shadow)}
   .empty b{display:block;color:var(--text);font-size:16px;margin-bottom:5px}
 
-  /* Footer. Not decoration: this is where a payment provider's reviewer looks
-     for the terms, and where a reader looks for who is behind the site. */
-  footer.foot{border-top:1px solid var(--brd);padding:38px 0 30px;color:var(--muted);font-size:13.5px}
-  .foot-top{display:flex;gap:34px 56px;flex-wrap:wrap;align-items:flex-start}
-  .foot-brand{flex:1 1 220px;min-width:0}
-  .foot-brand .brand{font-size:19px}
-  .foot-brand p{margin:8px 0 0;font-size:12.5px;color:var(--faint);max-width:34ch;line-height:1.55}
-  .foot-col{display:flex;flex-direction:column;gap:9px;min-width:120px}
-  .foot-col h4{margin:0 0 2px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--faint);font-weight:700}
-  .foot-col a{color:var(--muted);text-decoration:none;font-size:13.5px}
-  .foot-col a:hover{color:var(--accent-ink)}
-  .foot-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    margin-top:30px;padding-top:18px;border-top:1px solid var(--brd);font-size:12.5px;color:var(--faint)}
+  /* Footer. Small on purpose: the only things anyone comes here for are how to
+     reach us and where the terms are. */
+  footer.foot{border-top:1px solid var(--brd);padding:34px 0 30px;color:var(--muted);font-size:13.5px}
+  .foot-help{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .foot-help .brand{font-size:19px}
+  .foot-links{display:flex;flex-direction:column;gap:6px;align-items:flex-end;text-align:right}
+  .foot-links a{color:var(--text);text-decoration:underline;font-size:13.5px}
+  .foot-links a:hover{color:var(--accent-ink)}
+  .foot-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    margin-top:26px;padding-top:16px;border-top:1px solid var(--brd);font-size:12.5px;color:var(--faint)}
   .foot-bar .sp{flex:1}
-  .socials{display:flex;gap:8px}
-  .socials a{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;
-    border:1px solid var(--brd);background:var(--panel);color:var(--muted);text-decoration:none}
+  .foot-bar a{color:var(--muted);text-decoration:none}
+  .foot-bar a:hover{color:var(--accent-ink)}
+  .socials{display:flex;gap:7px;margin-left:6px}
+  .socials a{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;
+    border:1px solid var(--brd);background:var(--panel);color:var(--muted)}
   .socials a:hover{color:var(--accent-ink);border-color:var(--accent)}
-  .socials svg{display:block;width:16px;height:16px;fill:currentColor}
-  @media (max-width:620px){ .foot-top{gap:26px} .foot-col{min-width:45%} }
+  .socials svg{display:block;width:15px;height:15px;fill:currentColor}
+  @media (max-width:620px){
+    .foot-links{align-items:flex-start;text-align:left}
+    .foot-bar{gap:12px} .foot-bar .sp{display:none}
+  }
 
   .card.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease, transform .55s cubic-bezier(.2,.7,.2,1)}
   .card.reveal.in{opacity:1;transform:none}
@@ -193,6 +194,19 @@
 </style>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/account.css">
+
+<script>
+  /* Theme, decided before anything is painted. Inline and first: app.js is
+     deferred, so choosing the theme there means a dark-mode reader sees a white
+     page flash first. No stored choice means "follow the system" — the toggle
+     writes a choice only when someone actually makes one, and clearing it hands
+     control back to the OS. */
+  (function () {
+    var saved = localStorage.getItem("kounsly.theme");
+    var dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  })();
+</script>
 
 <header class="top">
   <div class="wrap">
@@ -266,33 +280,20 @@
 
 <footer class="foot">
   <div class="wrap">
-    <div class="foot-top">
-      <div class="foot-brand">
-        <div class="brand">Koun<span class="grad-text">sly</span></div>
-        <p data-i18n="footer"></p>
-      </div>
-      <div class="foot-col">
-        <h4 data-i18n="f_product"></h4>
-        <a href="/" data-i18n="f_search"></a>
-        <a href="/#account/saved" data-i18n="f_saved"></a>
-        <a href="/#account/profile" data-i18n="f_profile"></a>
-      </div>
-      <div class="foot-col">
-        <h4 data-i18n="f_legal"></h4>
-        <a href="/terms" data-i18n="f_terms"></a>
-        <a href="/privacy" data-i18n="f_privacy"></a>
-      </div>
-      <div class="foot-col">
-        <h4 data-i18n="f_contact"></h4>
-        <a href="mailto:hello@kounsly.com">hello@kounsly.com</a>
+    <div class="foot-help">
+      <div class="brand">Koun<span class="grad-text">sly</span></div>
+      <div class="foot-links">
+        <a href="mailto:support@kounsly.com" data-i18n="f_help"></a>
+        <a href="mailto:support@kounsly.com">support@kounsly.com</a>
       </div>
     </div>
     <div class="foot-bar">
       <span>&copy; 2026 Kounsly. <span data-i18n="f_rights"></span></span>
       <span class="sp"></span>
-      <!-- Placeholders until the accounts exist. They point nowhere on purpose:
-           an icon linking to an empty profile is worse than an icon that waits.
-           Replace the href with the real handle and drop the title. -->
+      <a href="/terms" data-i18n="f_terms"></a>
+      <a href="/privacy" data-i18n="f_privacy"></a>
+      <!-- Placeholders until the accounts exist: an icon pointing at an empty
+           profile is worse than an icon that waits for one. -->
       <div class="socials">
         <a href="#" title="Скоро" aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2-.1-1.3-.1-1.7-.1-4.9s0-3.6.1-4.9c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4 1.3-.1 1.7-.1 4.9-.1zm0 3.2a6.6 6.6 0 1 0 0 13.2 6.6 6.6 0 0 0 0-13.2zm0 10.9a4.3 4.3 0 1 1 0-8.6 4.3 4.3 0 0 1 0 8.6zm8.4-11.2a1.5 1.5 0 1 1-3.1 0 1.5 1.5 0 0 1 3.1 0z"/></svg></a>
         <a href="#" title="Скоро" aria-label="X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 3h3.1l-6.8 7.8L21.8 21h-6.2l-4.9-6.4L5.1 21H2l7.3-8.3L2.5 3h6.4l4.4 5.8L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z"/></svg></a>

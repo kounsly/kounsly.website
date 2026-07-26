@@ -64,6 +64,13 @@
       sort_deadline: "Спочатку найближчий дедлайн", sort_added: "Спочатку додані останніми",
       empty_saved: "Тут поки порожньо — тисни ★ на будь-якій програмі.",
       empty_watch: "Порожньо. Збережи програму серцем — і її дедлайн з'явиться тут.",
+      ck_progress: "Заявка: {d} з {t}", ck_add: "+ свій пункт", ck_drop: "Прибрати",
+      ck_go: "Портал подачі", ck_read: "Детальніше про програму",
+      ck_english: "Скласти або підтвердити англійську: {what}",
+      ck_portal: "Зареєструватися на порталі {host}",
+      ck_submit: "Подати заявку до {date}",
+      ck_money: "Порахувати вартість року — плата, внесок, житло",
+      ck_seeded: "Підказки з даних програми. Виправ або прибери зайве — список твій.",
       no_date: "Дату подачі на офіційній сторінці не вказано.",
       who_hint: "Не знаємо твого громадянства, тому показуємо найближчу дату з усіх.",
       who_hint_go: "Вказати в профілі",
@@ -72,7 +79,6 @@
       s_login: "Вхід", f_email: "Пошта", f_pw: "Пароль", pw_change: "Новий пароль",
       s_delete: "Видалити всі свої дані",
       b_delete: "Зникають профіль, збережені, нотатки, дедлайни й історія — назавжди, без кошика. Каталог це не чіпає: пошуком можна користуватися й без акаунта.",
-      b_delete_auth: "Твоя пошта лишиться у списку входів Supabase — стерти її можемо тільки ключем, який відкриває всі акаунти проєкту, і такого ключа ми на сервері не тримаємо. Але за нею більше не буде жодних твоїх даних.",
       del: "Видалити всі дані", del_word: "ВИДАЛИТИ",
       del_confirm: "Скасувати це неможливо. Щоб підтвердити, введи <b>{w}</b> у полі нижче.",
       del_go: "Так, видалити все", del_cancel: "Скасувати", del_err: "Не вдалося видалити. Спробуй ще раз.",
@@ -115,6 +121,13 @@
       sort_deadline: "Nearest deadline first", sort_added: "Most recently added first",
       empty_saved: "Nothing here yet — hit ★ on any programme.",
       empty_watch: "Nothing here. Save a programme with the heart and its deadline shows up.",
+      ck_progress: "Application: {d} of {t}", ck_add: "+ your own step", ck_drop: "Remove",
+      ck_go: "Application portal", ck_read: "More about the programme",
+      ck_english: "Take or confirm English: {what}",
+      ck_portal: "Register on {host}",
+      ck_submit: "Apply by {date}",
+      ck_money: "Work out the cost of a year — tuition, fee, housing",
+      ck_seeded: "Suggested from this programme's own data. Edit or delete — the list is yours.",
       no_date: "The official page states no application date.",
       who_hint: "We don't know your citizenship, so this is the nearest date of all of them.",
       who_hint_go: "Set it in the profile",
@@ -123,7 +136,6 @@
       s_login: "Sign-in", f_email: "E-mail", f_pw: "Password", pw_change: "New password",
       s_delete: "Delete all your data",
       b_delete: "Profile, saved list, notes, deadlines and history — gone for good, no bin to recover from. The catalogue is untouched: search works without an account.",
-      b_delete_auth: "Your address stays in Supabase's own sign-in list — removing it needs a key that opens every account in the project, and we don't keep one on the server. Nothing of yours will be behind it.",
       del: "Delete all data", del_word: "DELETE",
       del_confirm: "This cannot be undone. Type <b>{w}</b> below to confirm.",
       del_go: "Yes, delete everything", del_cancel: "Cancel", del_err: "Couldn't delete. Try again.",
@@ -619,6 +631,13 @@
     strip.appendChild(toggle);
     item.appendChild(strip);
 
+    // What is still left to do for this programme. Seeded from what the
+    // catalogue actually states — the portal it names, the date it gives, the
+    // certificate it asks for — and never from a guess about how this
+    // university admits people. Every line is editable and removable, because
+    // the official page is what is true and this is only our reading of it.
+    item.appendChild(checklist(row, meta));
+
     var note = el("textarea", "ac-note");
     note.placeholder = T("note_ph");
     note.value = meta.note || "";
@@ -644,6 +663,112 @@
         .catch(function () { flag.remove(); });
     };
     return item;
+  }
+
+  /** Suggested steps, each one traceable to a stated fact. Nothing is added
+   *  because it is "usually needed": no line here exists without a field
+   *  behind it. */
+  function seedChecklist(row) {
+    var items = [];
+    var need = [];
+    if (row.ielts != null) need.push("IELTS " + row.ielts);
+    if (row.toefl_ibt != null) need.push("TOEFL " + row.toefl_ibt);
+    if (!need.length && row.english_cefr) need.push(row.english_cefr);
+    if (need.length) items.push({ text: T("ck_english").replace("{what}", need.join(" / ")), done: false });
+
+    if (row.application_url) {
+      items.push({ text: T("ck_portal").replace("{host}", hostOf(row.application_url)), done: false });
+    }
+    var own = P().ownDeadlines ? P().ownDeadlines(row.deadlines) : row.deadlines;
+    var next = P().nextDeadline ? P().nextDeadline(own) : null;
+    if (next) items.push({ text: T("ck_submit").replace("{date}", P().dateLabel(next)), done: false });
+    if (row.tuition_free || row.tuition_eur_year != null || row.semester_fee_raw) {
+      items.push({ text: T("ck_money"), done: false });
+    }
+    return items;
+  }
+
+  function hostOf(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; }
+  }
+
+  function checklist(row, meta) {
+    var box = el("div", "ac-check");
+    var items = (meta.checklist && meta.checklist.length) ? meta.checklist.slice() : seedChecklist(row);
+    var seeded = !(meta.checklist && meta.checklist.length);
+
+    var head = el("div", "ac-check-head");
+    var count = el("span", "ac-check-n");
+    var bar = el("div", "ac-check-bar");
+    var fill = el("i");
+    bar.appendChild(fill);
+    head.appendChild(count);
+    head.appendChild(bar);
+    if (row.application_url) {
+      var portal = el("a", "ac-portal", T("ck_go") + " ↗");
+      portal.href = row.application_url;
+      portal.target = "_blank";
+      portal.rel = "noopener";
+      portal.title = hostOf(row.application_url);
+      head.appendChild(portal);
+    }
+    box.appendChild(head);
+
+    var list = el("div", "ac-check-list");
+    box.appendChild(list);
+
+    function save() {
+      seeded = false;
+      A.annotateSaved(row.uid, { checklist: items }, true).catch(function () {});
+    }
+
+    function draw() {
+      list.innerHTML = "";
+      var done = items.filter(function (i) { return i.done; }).length;
+      count.textContent = T("ck_progress").replace("{d}", done).replace("{t}", items.length);
+      fill.style.width = items.length ? Math.round((done / items.length) * 100) + "%" : "0%";
+      box.classList.toggle("ac-seeded", seeded);
+      list.setAttribute("data-hint", T("ck_seeded"));
+
+      items.forEach(function (it, i) {
+        var line = el("label", "ac-check-item" + (it.done ? " done" : ""));
+        var cb = el("input");
+        cb.type = "checkbox";
+        cb.checked = !!it.done;
+        cb.onchange = function () { it.done = cb.checked; save(); draw(); };
+        line.appendChild(cb);
+        line.appendChild(el("span", "tick", "✓"));
+        var text = el("span", "t", it.text);
+        text.contentEditable = "true";
+        text.spellcheck = false;
+        text.onblur = function () {
+          var v = text.textContent.trim();
+          if (v === it.text) return;
+          if (!v) { items.splice(i, 1); } else { it.text = v; }
+          save(); draw();
+        };
+        text.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); text.blur(); } };
+        line.appendChild(text);
+        var x = el("button", "x", "✕");
+        x.type = "button";
+        x.title = T("ck_drop");
+        x.onclick = function (e) { e.preventDefault(); items.splice(i, 1); save(); draw(); };
+        line.appendChild(x);
+        list.appendChild(line);
+      });
+
+      var add = el("button", "ac-check-add", T("ck_add"));
+      add.type = "button";
+      add.onclick = function () {
+        items.push({ text: "", done: false });
+        draw();
+        var last = list.querySelectorAll(".ac-check-item .t");
+        if (last.length) last[last.length - 1].focus();
+      };
+      list.appendChild(add);
+    }
+    draw();
+    return box;
   }
 
   /* ---------- deadlines ---------- */
@@ -690,7 +815,7 @@
         when.appendChild(el("span", null, P().daysLabel(line.d.days)));
         r.appendChild(when);
         var body = el("div", "body");
-        body.appendChild(el("div", "t", line.row.title));
+        body.appendChild(el("div", "t", line.row.name));
         var where = P().countryName ? P().countryName(line.row.country) : line.row.country;
         body.appendChild(el("div", "s", [line.row.university, where].filter(Boolean).join(" · ")));
         // Whose date this is, said out loud whenever the page said it. "For
@@ -699,6 +824,17 @@
         if (line.d.applies_to) {
           body.appendChild(el("span", "ac-who-tag" + (line.mine ? "" : " plain"),
                               P().deadlineWho(line.d.applies_to)));
+        }
+        var open = el("button", "ac-dl-open", T("ck_read") + " →");
+        open.type = "button";
+        open.onclick = function () { openProgramme(line.row.uid); };
+        body.appendChild(open);
+        if (line.row.application_url) {
+          var to = el("a", "ac-dl-open portal", T("ck_go") + " ↗");
+          to.href = line.row.application_url;
+          to.target = "_blank";
+          to.rel = "noopener";
+          body.appendChild(to);
         }
         r.appendChild(body);
         box.appendChild(r);
@@ -710,8 +846,12 @@
         when.appendChild(el("b", null, "—"));
         r.appendChild(when);
         var body = el("div", "body");
-        body.appendChild(el("div", "t", row.title));
+        body.appendChild(el("div", "t", row.name));
         body.appendChild(el("div", "s", T("no_date")));
+        var open2 = el("button", "ac-dl-open", T("ck_read") + " →");
+        open2.type = "button";
+        open2.onclick = function () { openProgramme(row.uid); };
+        body.appendChild(open2);
         r.appendChild(body);
         box.appendChild(r);
       });
@@ -728,6 +868,13 @@
         box.appendChild(hint);
       }
     }, box);
+  }
+
+  /** Open the programme sheet on top of the account. The account stays where
+   *  it was underneath, so closing the programme returns to the list rather
+   *  than to the search. */
+  function openProgramme(uid) {
+    if (P().openSheet) P().openSheet(uid);
   }
 
   /* ---------- data and security ---------- */
@@ -747,7 +894,6 @@
        sake: this is the only button on the site that destroys something. */
     var danger = pane(main, "s_delete", "b_delete");
     danger.classList.add("danger");
-    danger.appendChild(el("p", "ac-hint", T("b_delete_auth")));
     var start = el("button", "btn danger", T("del"));
     start.type = "button";
     danger.appendChild(start);
