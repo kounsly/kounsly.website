@@ -1,8 +1,9 @@
 """Kounsly API — search over the real catalogue, and a grounded assistant.
 
-The catalogue is a read-only SQLite file built by kounsly-pipeline and shipped
-inside the image, so search costs nothing to serve and a data rebuild is an
-ordinary deploy.
+The catalogue is a read-only SQLite file built by kounsly-pipeline, mounted from
+the host and opened per request, so search costs nothing to serve. It travelled
+inside the image until five countries made it 78 MB — see the Dockerfile for
+why that had to stop.
 
 The assistant answers **only** from one programme's stored fields. It is not a
 general chatbot: an admissions answer that sounds right and is wrong costs a
@@ -27,8 +28,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent
+# In production this is a read-only bind mount from the host (/data/kounsly),
+# because the catalogue outgrew being committed to git. Locally it is the file
+# the pipeline writes next to this one, so `uvicorn app:app` still just works.
 DB_PATH = Path(os.getenv("KOUNSLY_DB", ROOT / "kounsly.db"))
 INDEX = ROOT / "index.html"
+
+if not DB_PATH.exists():
+    # Said once, loudly, at startup. Without this the first symptom is a
+    # sqlite "unable to open database file" on every request, which reads like
+    # a code bug rather than a missing mount.
+    print(f"FATAL: no catalogue at {DB_PATH}. In production this is the host "
+          f"mount; check the volume and KOUNSLY_DB.", flush=True)
 
 CHAT_MODEL = os.getenv("KOUNSLY_CHAT_MODEL", "gemini-3.6-flash")
 GCP_PROJECT = os.getenv("GCP_PROJECT", "kounsly")
