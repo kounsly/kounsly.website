@@ -48,8 +48,21 @@
       email_ph: "твоя@пошта.com", email_send: "Надіслати код",
       code_t: "Код надіслано на {email}", code_ph: "6 цифр", code_send: "Підтвердити",
       code_again: "Надіслати ще раз", back: "← Інший спосіб",
+      pw_ph: "Пароль", pw_in: "Увійти", pw_up: "Створити акаунт",
+      to_up: "Немає акаунта? Створити", to_in: "Вже є акаунт? Увійти",
+      pw_forgot: "Забув пароль?", pw_code: "Увійти кодом з пошти",
+      pw_confirm_t: "Підтвердь пошту",
+      pw_confirm_b: "Надіслали лист на {email}. Відкрий його — і акаунт буде готовий.",
+      pw_reset_sent: "Якщо на {email} є акаунт, лист для зміни пароля вже в дорозі.",
+      pw_new_t: "Новий пароль", pw_new_b: "Придумай новий пароль — і одразу ним увійдеш.",
+      pw_new_ph: "Новий пароль", pw_new_save: "Зберегти",
+      pw_changed: "Пароль змінено.",
       legal: "Входячи, ти погоджуєшся з умовами. Ми не продаємо дані й не надсилаємо спам.",
       err_email: "Схоже, це не пошта.", err_code: "Код не підійшов. Спробуй ще раз.",
+      err_pw_short: "Пароль має бути щонайменше 8 символів.",
+      err_pw_wrong: "Пошта або пароль не підходять.",
+      err_pw_taken: "Такий акаунт уже є. Спробуй увійти.",
+      err_pw_unconfirmed: "Пошта ще не підтверджена — перевір лист від нас.",
       err_generic: "Не вдалося. Спробуй ще раз за хвилину.",
       sending: "Надсилаю…", checking: "Перевіряю…",
       ob_t: "Чотири питання — і сторінки почнуть говорити про тебе",
@@ -79,8 +92,21 @@
       email_ph: "you@email.com", email_send: "Send code",
       code_t: "Code sent to {email}", code_ph: "6 digits", code_send: "Confirm",
       code_again: "Send again", back: "← Another way",
+      pw_ph: "Password", pw_in: "Sign in", pw_up: "Create account",
+      to_up: "No account? Create one", to_in: "Already have one? Sign in",
+      pw_forgot: "Forgot your password?", pw_code: "E-mail me a code instead",
+      pw_confirm_t: "Confirm your e-mail",
+      pw_confirm_b: "We sent a message to {email}. Open it and the account is ready.",
+      pw_reset_sent: "If {email} has an account, a reset e-mail is on its way.",
+      pw_new_t: "New password", pw_new_b: "Pick a new one and you're signed in with it.",
+      pw_new_ph: "New password", pw_new_save: "Save",
+      pw_changed: "Password changed.",
       legal: "By signing in you accept the terms. We don't sell data and we don't send spam.",
       err_email: "That doesn't look like an e-mail.", err_code: "That code didn't work. Try again.",
+      err_pw_short: "A password needs at least 8 characters.",
+      err_pw_wrong: "That e-mail and password don't match.",
+      err_pw_taken: "There's already an account for this address. Try signing in.",
+      err_pw_unconfirmed: "That address isn't confirmed yet — check for our e-mail.",
       err_generic: "Didn't work. Try again in a minute.",
       sending: "Sending…", checking: "Checking…",
       ob_t: "Four questions, and the pages start talking about you",
@@ -251,11 +277,95 @@
       "&redirect_to=" + encodeURIComponent(location.origin + location.pathname);
   }
 
+  /** POST to Supabase's auth API, resolved to { ok, status, data } so callers
+   *  can read an error body without each of them handling a non-JSON reply. */
+  function sbPost(path, body, headers) {
+    return sbFetch(path, { method: "POST", body: JSON.stringify(body), headers: headers })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; })
+          .then(function (d) { return { ok: r.ok, status: r.status, data: d || {} }; });
+      });
+  }
+
+  /** Supabase's error shape changed between versions and differs by endpoint —
+   *  a code in `error_code` on current projects, a sentence in `msg` or
+   *  `error_description` on older ones. Normalise to the few cases the sign-in
+   *  box actually says something different about; everything else is generic. */
+  function errCode(data) {
+    var code = data.error_code || data.code || "";
+    if (code) return code;
+    var text = String(data.msg || data.error_description || data.error || "").toLowerCase();
+    if (text.indexOf("invalid login") >= 0 || text.indexOf("invalid grant") >= 0) return "invalid_credentials";
+    if (text.indexOf("not confirmed") >= 0) return "email_not_confirmed";
+    if (text.indexOf("already registered") >= 0 || text.indexOf("already been registered") >= 0) return "user_already_exists";
+    if (text.indexOf("password") >= 0 && text.indexOf("least") >= 0) return "weak_password";
+    return "";
+  }
+
+  var PW_ERRORS = {
+    invalid_credentials: "err_pw_wrong",
+    email_not_confirmed: "err_pw_unconfirmed",
+    user_already_exists: "err_pw_taken",
+    email_exists: "err_pw_taken",
+    weak_password: "err_pw_short"
+  };
+
   function sendCode(email) {
     return sbFetch("/otp", {
       method: "POST",
       body: JSON.stringify({ email: email, create_user: true })
     }).then(function (r) { return r.ok; });
+  }
+
+  /* ---------- password ----------
+   *
+   * A password is the sign-in most people expect, and the only one that works
+   * when the e-mail takes four minutes to arrive or lands in spam. The code
+   * flow above stays as the way back in for anyone who has forgotten theirs
+   * before they ask for a reset.
+   */
+
+  function signInPassword(email, password) {
+    return sbPost("/token?grant_type=password", { email: email, password: password })
+      .then(function (r) {
+        if (r.ok && r.data.access_token) { setSession(r.data); return { ok: true }; }
+        return { ok: false, code: errCode(r.data) };
+      });
+  }
+
+  function signUpPassword(email, password) {
+    return sbPost("/signup", { email: email, password: password })
+      .then(function (r) {
+        if (!r.ok) return { ok: false, code: errCode(r.data) };
+        // With e-mail confirmation on — the default, and worth keeping — the
+        // reply carries a user but no session: the account exists and is not
+        // usable until the link in the e-mail is opened.
+        if (r.data.access_token) { setSession(r.data); return { ok: true, signedIn: true }; }
+        return { ok: true, signedIn: false };
+      });
+  }
+
+  /** Always reported as sent, whatever the answer. Telling a stranger whether
+   *  an address has an account here is telling them who our users are. */
+  function sendReset(email) {
+    return sbPost("/recover?redirect_to=" + encodeURIComponent(location.origin + location.pathname),
+                  { email: email })
+      .then(function () { return true; })
+      .catch(function () { return true; });
+  }
+
+  function setPassword(password) {
+    return token().then(function (t) {
+      if (!t) return { ok: false, code: "" };
+      return sbFetch("/user", {
+        method: "PUT",
+        headers: { authorization: "Bearer " + t },
+        body: JSON.stringify({ password: password })
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; })
+          .then(function (d) { return { ok: r.ok, code: r.ok ? "" : errCode(d || {}) }; });
+      });
+    });
   }
 
   function verifyCode(email, code) {
@@ -271,12 +381,29 @@
       });
   }
 
-  /** Tokens come back in the URL fragment after an OAuth round trip. Read them,
-   *  then clear the fragment — an access token sitting in the address bar ends
-   *  up in screenshots, in shared links and in browser history. */
+  /** Tokens come back in the URL fragment after an OAuth round trip, and after
+   *  the links in our confirmation and password-reset e-mails. Read them, then
+   *  clear the fragment — an access token sitting in the address bar ends up in
+   *  screenshots, in shared links and in browser history.
+   *
+   *  Returns the kind of arrival, because a recovery link means the same thing
+   *  as a sign-in plus one more step: they came here to change the password. */
+  var arrivalType = null;
+
   function captureRedirect() {
-    if (!location.hash || location.hash.indexOf("access_token") < 0) return false;
+    if (!location.hash) return false;
     var h = new URLSearchParams(location.hash.slice(1));
+
+    // An expired or already-used link comes back as an error rather than a
+    // token. Silently doing nothing looks like the link was ignored.
+    if (h.get("error")) {
+      arrivalType = "error";
+      history.replaceState(null, "", location.pathname + location.search);
+      return false;
+    }
+    if (!h.get("access_token")) return false;
+
+    arrivalType = h.get("type") || "signin";
     setSession({
       access_token: h.get("access_token"),
       refresh_token: h.get("refresh_token"),
@@ -364,36 +491,210 @@
     });
   }
 
-  function emailStep() {
+  function looksLikeEmail(s) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s); }
+
+  /** Hide the provider buttons and give the step area back a way out. */
+  function stepAlone() {
     var g = document.getElementById("gate");
-    g.querySelector(".gate-choices").style.display = "none";
+    var choices = g.querySelector(".gate-choices");
+    if (choices) choices.style.display = "none";
+    return document.getElementById("gate-step");
+  }
+
+  function backToChoices() {
+    var g = document.getElementById("gate");
+    if (!g) return;
+    var choices = g.querySelector(".gate-choices");
+    if (choices) choices.style.display = "";
     var step = document.getElementById("gate-step");
+    if (step) step.innerHTML = "";
+  }
+
+  /* The e-mail route asks for a password, because that is the sign-in people
+   * expect and the one that still works when the e-mail is slow or in spam.
+   * `mode` is "in" or "up"; both are one form, because which one someone needs
+   * is not something they should have to decide before typing their address. */
+  function emailStep(mode, email) {
+    mode = mode === "up" ? "up" : "in";
+    var step = stepAlone();
+    var submit = mode === "up" ? "pw_up" : "pw_in";
+
     step.innerHTML =
-      '<form class="gate-form" id="gate-email">' +
-        '<input type="email" id="gate-email-in" autocomplete="email" inputmode="email" placeholder="' + esc(T("email_ph")) + '" required>' +
-        '<button type="submit">' + esc(T("email_send")) + "</button>" +
+      // novalidate: the rules are checked below, in our words and in the
+      // reader's language. Left to the browser, `minlength` silently refuses to
+      // submit and shows its own tooltip — in the browser's language, not the
+      // page's — and the message written for this box never appears.
+      '<form class="gate-form stack" id="gate-email" novalidate>' +
+        '<input type="email" id="gate-email-in" autocomplete="email" inputmode="email" ' +
+          'placeholder="' + esc(T("email_ph")) + '" value="' + esc(email || "") + '" required>' +
+        '<input type="password" id="gate-pw-in" placeholder="' + esc(T("pw_ph")) + '" ' +
+          'autocomplete="' + (mode === "up" ? "new-password" : "current-password") + '" required>' +
+        '<button type="submit">' + esc(T(submit)) + "</button>" +
+      "</form>" +
+      '<div class="gate-err" id="gate-err"></div>' +
+      '<div class="gate-links">' +
+        '<button type="button" data-act="mode">' + esc(T(mode === "up" ? "to_in" : "to_up")) + "</button>" +
+        (mode === "up" ? "" : '<button type="button" data-act="forgot">' + esc(T("pw_forgot")) + "</button>") +
+        '<button type="button" data-act="code">' + esc(T("pw_code")) + "</button>" +
+      "</div>" +
+      '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
+
+    var emailIn = document.getElementById("gate-email-in");
+    var pwIn = document.getElementById("gate-pw-in");
+    (email ? pwIn : emailIn).focus();
+
+    step.querySelector(".gate-back").onclick = backToChoices;
+    step.querySelectorAll(".gate-links button").forEach(function (b) {
+      b.onclick = function () {
+        var act = b.getAttribute("data-act");
+        var typed = emailIn.value.trim();
+        if (act === "mode") emailStep(mode === "up" ? "in" : "up", typed);
+        else if (act === "code") codeRequestStep(typed);
+        else if (act === "forgot") resetStep(typed);
+      };
+    });
+
+    document.getElementById("gate-email").onsubmit = function (e) {
+      e.preventDefault();
+      var address = emailIn.value.trim();
+      var password = pwIn.value;
+      if (!looksLikeEmail(address)) { fail(T("err_email")); return; }
+      if (password.length < 8) { fail(T("err_pw_short")); return; }
+
+      var btn = e.target.querySelector("button");
+      btn.disabled = true;
+      btn.textContent = T(mode === "up" ? "sending" : "checking");
+      fail("");
+
+      var run = mode === "up" ? signUpPassword(address, password) : signInPassword(address, password);
+      run
+        .then(function (r) {
+          if (!r.ok) { fail(T(PW_ERRORS[r.code] || "err_generic")); return; }
+          if (mode === "up" && !r.signedIn) { confirmSentStep(address); return; }
+          arrived();
+        })
+        .catch(function () { fail(T("err_generic")); })
+        .finally(function () {
+          if (!document.getElementById("gate-email")) return;   // the step moved on
+          btn.disabled = false;
+          btn.textContent = T(submit);
+        });
+    };
+  }
+
+  /** Signed up, e-mail not confirmed yet. There is nothing to do here but
+   *  say so — the link in the message finishes it, and lands back on the site
+   *  signed in. */
+  function confirmSentStep(email) {
+    var step = stepAlone();
+    step.innerHTML =
+      "<h3 class=\"gate-sub\">" + esc(T("pw_confirm_t")) + "</h3>" +
+      '<p class="gate-sent">' + esc(T("pw_confirm_b").replace("{email}", email)) + "</p>" +
+      '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
+    step.querySelector(".gate-back").onclick = backToChoices;
+  }
+
+  function resetStep(email) {
+    var step = stepAlone();
+    step.innerHTML =
+      "<h3 class=\"gate-sub\">" + esc(T("pw_forgot")) + "</h3>" +
+      '<form class="gate-form" id="gate-reset" novalidate>' +
+        '<input type="email" id="gate-reset-in" autocomplete="email" inputmode="email" ' +
+          'placeholder="' + esc(T("email_ph")) + '" value="' + esc(email || "") + '" required>' +
+        "<button type=\"submit\">" + esc(T("email_send")) + "</button>" +
       "</form>" +
       '<div class="gate-err" id="gate-err"></div>' +
       '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
 
-    step.querySelector(".gate-back").onclick = function () {
-      g.querySelector(".gate-choices").style.display = "";
-      step.innerHTML = "";
-    };
-
-    var input = document.getElementById("gate-email-in");
+    step.querySelector(".gate-back").onclick = function () { emailStep("in", email); };
+    var input = document.getElementById("gate-reset-in");
     input.focus();
-    document.getElementById("gate-email").onsubmit = function (e) {
+    document.getElementById("gate-reset").onsubmit = function (e) {
       e.preventDefault();
-      var email = input.value.trim();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { fail(T("err_email")); return; }
+      var address = input.value.trim();
+      if (!looksLikeEmail(address)) { fail(T("err_email")); return; }
       var btn = e.target.querySelector("button");
       btn.disabled = true;
       btn.textContent = T("sending");
-      sendCode(email)
-        .then(function (ok) { if (ok) codeStep(email); else fail(T("err_generic")); })
+      sendReset(address).then(function () { sentStep(T("pw_reset_sent").replace("{email}", address)); });
+    };
+  }
+
+  function sentStep(message) {
+    var step = stepAlone();
+    step.innerHTML =
+      '<p class="gate-sent">' + esc(message) + "</p>" +
+      '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
+    step.querySelector(".gate-back").onclick = backToChoices;
+  }
+
+  /** The passwordless way in, kept for anyone who has never set a password or
+   *  cannot remember one. */
+  function codeRequestStep(email) {
+    var step = stepAlone();
+    step.innerHTML =
+      '<form class="gate-form" id="gate-otp" novalidate>' +
+        '<input type="email" id="gate-otp-in" autocomplete="email" inputmode="email" ' +
+          'placeholder="' + esc(T("email_ph")) + '" value="' + esc(email || "") + '" required>' +
+        "<button type=\"submit\">" + esc(T("email_send")) + "</button>" +
+      "</form>" +
+      '<div class="gate-err" id="gate-err"></div>' +
+      '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
+
+    step.querySelector(".gate-back").onclick = function () { emailStep("in", email); };
+    var input = document.getElementById("gate-otp-in");
+    input.focus();
+    document.getElementById("gate-otp").onsubmit = function (e) {
+      e.preventDefault();
+      var address = input.value.trim();
+      if (!looksLikeEmail(address)) { fail(T("err_email")); return; }
+      var btn = e.target.querySelector("button");
+      btn.disabled = true;
+      btn.textContent = T("sending");
+      sendCode(address)
+        .then(function (ok) { if (ok) codeStep(address); else fail(T("err_generic")); })
         .catch(function () { fail(T("err_generic")); })
-        .finally(function () { btn.disabled = false; btn.textContent = T("email_send"); });
+        .finally(function () {
+          if (!document.getElementById("gate-otp")) return;
+          btn.disabled = false;
+          btn.textContent = T("email_send");
+        });
+    };
+  }
+
+  /** Arrived from a password-reset link: signed in already, and one step from
+   *  a password that will work next time. */
+  function newPasswordStep() {
+    var g = gateNode();
+    g.innerHTML =
+      '<div class="gate" role="dialog" aria-modal="true">' +
+        '<button class="gate-close" aria-label="Close">✕</button>' +
+        "<h2>" + esc(T("pw_new_t")) + "</h2>" +
+        '<p class="gate-lede">' + esc(T("pw_new_b")) + "</p>" +
+        '<form class="gate-form stack" id="gate-newpw" novalidate>' +
+          '<input type="password" id="gate-newpw-in" autocomplete="new-password" ' +
+            'placeholder="' + esc(T("pw_new_ph")) + '" required>' +
+          "<button type=\"submit\">" + esc(T("pw_new_save")) + "</button>" +
+        "</form>" +
+        '<div class="gate-err" id="gate-err"></div>' +
+      "</div>";
+    g.classList.add("open");
+    document.body.style.overflow = "hidden";
+    g.querySelector(".gate-close").onclick = closeGate;
+
+    var input = document.getElementById("gate-newpw-in");
+    input.focus();
+    document.getElementById("gate-newpw").onsubmit = function (e) {
+      e.preventDefault();
+      if (input.value.length < 8) { fail(T("err_pw_short")); return; }
+      var btn = e.target.querySelector("button");
+      btn.disabled = true;
+      setPassword(input.value)
+        .then(function (r) {
+          if (r.ok) closeGate();
+          else { fail(T(PW_ERRORS[r.code] || "err_generic")); btn.disabled = false; }
+        })
+        .catch(function () { fail(T("err_generic")); btn.disabled = false; });
     };
   }
 
@@ -622,6 +923,10 @@
           '<div class="acct-email">' + esc(email) + "</div>" +
           '<button data-act="saved">' + esc(T("saved_list")) + " (" + me.saved.length + ")</button>" +
           '<button data-act="profile">' + esc(T("profile")) + "</button>" +
+          // Also the way to *set* a first password: someone who signed up with
+          // a code or with Google has never had one, and this is where they
+          // would look for it.
+          '<button data-act="password">' + esc(T("pw_new_t")) + "</button>" +
           '<button data-act="out">' + esc(T("signout")) + "</button>" +
         "</div>" +
       "</div>";
@@ -637,6 +942,7 @@
         var act = b.getAttribute("data-act");
         if (act === "out") signOut();
         else if (act === "profile") openOnboarding();
+        else if (act === "password") newPasswordStep();
         else if (act === "saved" && api.onShowSaved) api.onShowSaved();
       };
     });
@@ -677,7 +983,15 @@
           api.enabled = !!cfg.enabled;
           anonQuota = cfg.quota || null;
           if (!api.enabled) { emit(); return null; }
-          if (justReturned) return arrived();
+          // An expired confirmation or reset link: say so rather than dropping
+          // them on a page that looks like it ignored the click.
+          if (arrivalType === "error") { emit(); openGate("default", null); return null; }
+          if (justReturned) {
+            // A reset link signs them in *and* means they came to change the
+            // password. Finish the sign-in first, then ask for the new one.
+            var recovery = arrivalType === "recovery";
+            return arrived().then(function (r) { if (recovery) newPasswordStep(); return r; });
+          }
           return loadMe();
         })
         .catch(function () { emit(); return null; });
@@ -697,6 +1011,40 @@
     },
 
     fetch: authFetch,
+
+    /* ---------- search history ----------
+     *
+     * Kept only for people who have an account, because it is the account
+     * that makes it useful — the same list on the phone and the laptop. A
+     * signed-out visitor's searches stay in their own browser and nowhere else.
+     */
+    history: function () { return (me && me.history) || []; },
+
+    rememberSearch: function (q, params) {
+      if (!me || !q) return Promise.resolve();
+      var recent = api.history();
+      // Already at the top: re-running the search you are already looking at
+      // is not new information, and a write per keystroke-driven re-search is
+      // a lot of writes.
+      if (recent.length && recent[0].q === q && recent[0].params === params) return Promise.resolve();
+      return authFetch("/api/history", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ q: q, params: params || "" })
+      })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { if (d && me) { me.history = d.history; emit(); } })
+        .catch(function () {});
+    },
+
+    forgetSearch: function (q) {
+      if (!me) return Promise.resolve();
+      return authFetch("/api/history" + (q ? "?q=" + encodeURIComponent(q) : ""), { method: "DELETE" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { if (d && me) { me.history = d.history; emit(); } })
+        .catch(function () {});
+    },
+
     isSaved: isSaved,
     isWatched: isWatched,
     toggleSaved: function (uid) { return toggle("saved", uid); },

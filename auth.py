@@ -251,6 +251,61 @@ def remove(kind: str, user_id: str, uid: str) -> None:
     query(f"DELETE FROM {TABLES[kind]} WHERE user_id = %s AND uid = %s", (user_id, uid), write=True)
 
 
+# ---------- search history ----------
+
+RECENT_SEARCHES = 8
+
+
+def record_search(user_id: str, q: str, params: str = "") -> None:
+    """Remember a phrase this reader searched for.
+
+    Re-searching the same phrase moves it back to the top instead of adding a
+    row: what makes this useful is getting back to a search, and one search
+    repeated is one thing to get back to.
+
+    Never raises. A history write failing must not turn a working search into a
+    broken page — this is a convenience, and the results are the product.
+    """
+    q = (q or "").strip()[:200]
+    if not accounts_available() or not q:
+        return
+    try:
+        query(
+            """
+            INSERT INTO search_event (user_id, q, params) VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, q) DO UPDATE
+              SET created_at = now(), params = EXCLUDED.params
+            """,
+            (user_id, q, (params or "")[:500]), write=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"search not recorded: {str(e)[:160]}")
+
+
+def recent_searches(user_id: str) -> list[dict[str, Any]]:
+    try:
+        rows = query(
+            "SELECT q, params FROM search_event WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
+            (user_id, RECENT_SEARCHES),
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"history unavailable: {str(e)[:160]}")
+        return []
+    return [{"q": r["q"], "params": r["params"] or ""} for r in rows]
+
+
+def forget_searches(user_id: str, q: str = "") -> None:
+    """Drop one remembered search, or all of them.
+
+    Deleting your own history has to work without asking us, and it has to be
+    a real delete — there is no archived copy of this table.
+    """
+    if q:
+        query("DELETE FROM search_event WHERE user_id = %s AND q = %s", (user_id, q[:200]), write=True)
+    else:
+        query("DELETE FROM search_event WHERE user_id = %s", (user_id,), write=True)
+
+
 # ---------- the meter ----------
 
 def _month_start() -> datetime:

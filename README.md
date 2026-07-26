@@ -103,7 +103,8 @@ Account-related variables are in [SETUP-AUTH.md](SETUP-AUTH.md).
 | `GET /api/programs?uids=a,b` | Card rows for an explicit set — how a saved list renders |
 | `POST /api/ask` | The grounded assistant |
 | `GET /api/config` | What the browser needs before it knows who is looking |
-| `GET/PUT /api/me`, `/api/saved`, `/api/watch`, `/api/history` | Accounts |
+| `GET/PUT /api/me` | The account: profile, saved list, history, quota |
+| `POST/DELETE /api/saved`, `/api/watch`, `/api/history` | What the account keeps |
 | `GET /api/health` | Row count, and whether the assistant and accounts are configured |
 
 ## How search actually works

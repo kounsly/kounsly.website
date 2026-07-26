@@ -126,6 +126,7 @@
       f_tuition: "Плата за навчання", f_deadline: "Найближчий дедлайн", f_english: "Англійська", f_duration: "Тривалість", f_ects: "Обсяг",
       open: "Детальніше →", broadened: "Точного збігу не знайшлось — показую близькі результати.",
       empty_t: "Нічого не знайшлось.", empty_b: "Спробуй інші слова або послаб фільтри.",
+      forget: "Прибрати з історії",
       d_money: "Гроші", d_reqs: "Вимоги до вступу", d_lang: "Мова навчання й вимоги", d_deadlines: "Дедлайни",
       d_about: "Про програму", d_funding: "Фінансування та стипендії", d_support: "Підтримка іноземних студентів",
       d_semester: "Семестровий внесок", d_living: "Життя на місяць", d_apply: "Куди подаватися й де що шукати",
@@ -187,6 +188,7 @@
       f_tuition: "Tuition", f_deadline: "Next deadline", f_english: "English", f_duration: "Duration", f_ects: "Credits",
       open: "Details →", broadened: "No exact match — showing close results.",
       empty_t: "Nothing matched.", empty_b: "Try different words or loosen the filters.",
+      forget: "Remove from history",
       d_money: "Money", d_reqs: "Admission requirements", d_lang: "Teaching language & requirements", d_deadlines: "Deadlines",
       d_about: "About the programme", d_funding: "Funding & scholarships", d_support: "Support for international students",
       d_semester: "Semester contribution", d_living: "Living cost per month", d_apply: "Where to apply and where to look",
@@ -369,14 +371,28 @@
   }
 
   var searchToken = 0;
+  var historyTimer = null;
+
+  /* The box searches as you type, so most of what runs through here is a
+   * prefix of what someone meant — "маг", "магіст", "магістр". Recording each
+   * one would fill the history with things nobody searched for. Waiting until
+   * a query has stood unchanged for a couple of seconds records the phrase
+   * they stopped at, and only that one. */
+  var REMEMBER_AFTER = 2500;
+
   function runSearch() {
     var list = $("list"), token = ++searchToken;
+    clearTimeout(historyTimer);
     list.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
     fetch("/api/search?" + params())
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (token !== searchToken) return;   // a newer query already answered
         render(data);
+        if (A && state.q && data.total) {
+          var q = state.q, saved = searchState();
+          historyTimer = setTimeout(function () { A.rememberSearch(q, saved); }, REMEMBER_AFTER);
+        }
       })
       .catch(function () {
         if (token !== searchToken) return;
@@ -555,6 +571,63 @@
     if (acts && current) acts.outerHTML = actsHTML(current);
     var left = document.getElementById("ask-left");
     if (left) paintQuota(left);
+    paintRecent();
+  }
+
+  /* ---------- search history ----------
+   *
+   * The filters are kept beside the phrase as JSON rather than as the query
+   * string the API takes: this round-trips the state exactly, and it means a
+   * change to how a filter is sent to the server does not silently reinterpret
+   * a search someone saved last month.
+   */
+
+  function searchState() {
+    return JSON.stringify({
+      country: state.country, area: state.area, subject: state.subject,
+      level: state.level, budget: state.budget, free: state.free, sort: state.sort
+    });
+  }
+
+  function restoreSearch(q, params) {
+    var saved = {};
+    try { saved = JSON.parse(params || "{}") || {}; } catch (e) { saved = {}; }
+    state.q = q;
+    ["country", "area", "subject", "level", "budget", "sort"].forEach(function (k) {
+      if (typeof saved[k] === "string") state[k] = saved[k];
+    });
+    state.free = !!saved.free;
+    state.page = 1;
+    $("q").value = q;
+    $("f-free").checked = state.free;
+    buildSelects();
+    runSearch();
+  }
+
+  function paintRecent() {
+    var box = $("recent"), examples = $("examples");
+    if (!box) return;
+    var recent = A ? A.history() : [];
+    box.innerHTML = "";
+    box.hidden = !recent.length;
+    if (examples) examples.hidden = !!recent.length;
+    if (!recent.length) return;
+
+    recent.forEach(function (item) {
+      var chip = el("button", "chip");
+      chip.type = "button";
+      chip.appendChild(document.createTextNode(item.q));
+      var x = el("span", "x", "✕");
+      x.title = T("forget");
+      chip.appendChild(x);
+      chip.addEventListener("click", function (e) {
+        // The ✕ is inside the chip so that the whole row stays one row; the
+        // click has to be told apart from a click on the search itself.
+        if (e.target === x) { e.stopPropagation(); A.forgetSearch(item.q); return; }
+        restoreSearch(item.q, item.params);
+      });
+      box.appendChild(chip);
+    });
   }
 
   function paintQuota(node) {

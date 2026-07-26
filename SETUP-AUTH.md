@@ -12,7 +12,7 @@ the part I can't do for you.
 
 Create a project (any region close to the users; Frankfurt for EU traffic).
 
-Then **SQL Editor → New query → paste `schema.sql` → Run.** It creates the four
+Then **SQL Editor → New query → paste `schema.sql` → Run.** It creates the five
 tables and is safe to re-run.
 
 From **Project Settings**, collect three values:
@@ -67,11 +67,33 @@ That is a real, deliverable address — deadline reminders will reach it — but
 means the same person signing in later with Google looks like a second account.
 Nothing to fix now; worth knowing before wondering about duplicate rows.
 
-## 4. E-mail codes — the one easy thing to get wrong
+## 4. E-mail and password
 
-Our sign-in box asks for a **six-digit code**, not a magic link. Supabase's
-default template only sends a link, and a reader gets an e-mail with nothing to
-type into the box.
+This is the default route in the sign-in box — an address, a password, and one
+button that says either *Увійти* or *Створити акаунт*. Supabase has the e-mail
+provider on out of the box, so **nothing here has to be switched on**. Three
+settings are worth looking at anyway.
+
+**Authentication → Providers → Email**
+
+- *Confirm email* — leave it **on**. Signing up then puts an account in place
+  that cannot be used until the link in the e-mail is opened, and the box says
+  so instead of pretending to be signed in. Turning it off lets anyone make an
+  account on someone else's address.
+- *Minimum password length* — set it to **8**. The form already refuses
+  anything shorter, and a server that allows 6 makes that a lie the moment
+  someone uses a different client.
+
+**Authentication → URL Configuration** has to be right for this, not only for
+Google — the confirmation and password-reset e-mails both come back to the site
+with the tokens in the fragment, and an address that is not on the redirect list
+is refused after the reader has already clicked. See §5.
+
+### The code fallback — the one easy thing to get wrong
+
+Under the password form there is *"Увійти кодом з пошти"*, which sends a
+**six-digit code** rather than a magic link. Supabase's default template only
+sends a link, and a reader gets an e-mail with nothing to type into the box.
 
 **Authentication → Email Templates → Magic Link**: make sure the body contains
 `{{ .Token }}`. Something like:
@@ -83,10 +105,15 @@ It expires in an hour. If you didn't ask for it, ignore this e-mail.
 
 Keeping `{{ .ConfirmationURL }}` as well is fine — then both work.
 
+The **Confirm signup** and **Reset password** templates need no editing: both
+ship with `{{ .ConfirmationURL }}`, which is exactly what the password flow
+uses.
+
 Supabase's built-in mailer is rate-limited to a handful of messages an hour,
-which is enough for testing and not enough for launch. Before real traffic,
-point **Authentication → Emails → SMTP** at Resend or Postmark from the domain
-you already send outreach from.
+which is enough for testing and not enough for launch. Every password sign-up
+sends one, so this is the first thing that will bite on a launch day. Before
+real traffic, point **Authentication → Emails → SMTP** at Resend or Postmark
+from the domain you already send outreach from.
 
 ## 5. URLs
 

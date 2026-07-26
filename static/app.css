@@ -284,9 +284,22 @@
   font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;
 }
 .gate-form button:disabled{opacity:.5;cursor:default}
+/* Address above password above button: side by side, the two fields read as
+   one thing to fill in and the submit ends up too narrow to name what it does. */
+.gate-form.stack{flex-direction:column}
+.gate-form.stack button{width:100%}
 /* A six-digit code is a figure, and figures are mono everywhere else here. */
 #gate-code-in{font-family:var(--mono);font-size:1.15rem;letter-spacing:.24em;text-align:center}
 .gate-sent{margin:0 0 10px;font-size:.88rem;color:var(--muted)}
+.gate-sub{margin:0 0 8px;font-family:var(--sans);font-size:.98rem;font-weight:650}
+/* Sign in / create / forgotten / by code — the alternatives, kept quiet. The
+   one someone needs is obvious to them and invisible to everyone else. */
+.gate-links{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:2px}
+.gate-links button{
+  border:0;background:none;padding:0;color:var(--muted);
+  font:inherit;font-size:.83rem;text-decoration:underline;cursor:pointer;
+}
+.gate-links button:hover{color:var(--text)}
 .gate-err{margin-top:9px;font-size:.84rem;color:var(--warn);min-height:1.1em}
 .gate-back{
   margin-top:6px;border:0;background:none;color:var(--muted);

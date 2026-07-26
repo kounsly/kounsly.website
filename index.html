@@ -107,6 +107,14 @@
   .chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px auto 0}
   .chip{font:inherit;font-size:13px;cursor:pointer;background:var(--panel);color:var(--muted);border:1px solid var(--brd);border-radius:999px;padding:7px 14px}
   .chip:hover{border-color:var(--accent);color:var(--accent-ink)}
+  /* Past searches sit where the examples were, and read as one's own notes
+     rather than as suggestions: no border until hovered, and a ✕ that only
+     appears then, so the row does not look like a list of things to dismiss. */
+  .chips.recent .chip{background:transparent;border-color:transparent;padding-right:8px}
+  .chips.recent .chip:hover{border-color:var(--brd);background:var(--panel)}
+  .chips.recent .chip .x{margin-left:8px;opacity:0;color:var(--faint);font-size:12px}
+  .chips.recent .chip:hover .x{opacity:1}
+  .chips.recent .chip .x:hover{color:var(--warn)}
   .samplenote{font-size:12.5px;color:var(--faint);margin:20px auto 0}
 
   .cols{display:grid;grid-template-columns:236px 1fr;gap:22px;padding:8px 0 96px;align-items:start}
@@ -199,11 +207,15 @@
       <input id="q" type="text" autocomplete="off" aria-label="query" data-i18n-ph="ph">
       <button class="btn primary" id="go" data-i18n="search"></button>
     </div>
-    <div class="chips">
+    <div class="chips" id="examples">
       <button class="chip" data-qi="1"></button>
       <button class="chip" data-qi="2"></button>
       <button class="chip" data-qi="3"></button>
     </div>
+    <!-- Filled by app.js from the account's search history, and shown instead
+         of the examples above once there is one: the examples are there to
+         teach the phrasing, and someone with a history has already learnt it. -->
+    <div class="chips recent" id="recent" hidden></div>
   </div>
 </section>
 

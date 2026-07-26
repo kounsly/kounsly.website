@@ -50,6 +50,24 @@ create table if not exists deadline_watch (
   primary key (user_id, uid)
 );
 
+-- Search history. One row per distinct phrase rather than one per search: the
+-- point of keeping it is "let me get back to what I was looking for", and the
+-- same query typed nine times is one thing to get back to, not nine. `params`
+-- is the rest of the search — country, level, budget — so reopening one
+-- restores the search rather than only the words.
+--
+-- Only for signed-in people, and only the phrase they typed. There is no
+-- anonymous search log here, and no record of what was shown back.
+create table if not exists search_event (
+  user_id    uuid not null references app_user(id) on delete cascade,
+  q          text not null,
+  params     text,
+  created_at timestamptz not null default now(),
+  primary key (user_id, q)
+);
+
+create index if not exists search_event_user on search_event (user_id, created_at desc);
+
 -- One row per answered question. This is the quota meter and the only usage
 -- record we keep; the question text is not stored.
 create table if not exists ask_event (
@@ -73,3 +91,4 @@ alter table app_user       enable row level security;
 alter table saved_program  enable row level security;
 alter table deadline_watch enable row level security;
 alter table ask_event      enable row level security;
+alter table search_event   enable row level security;

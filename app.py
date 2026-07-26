@@ -804,6 +804,7 @@ def me_payload(user: dict[str, Any], request: Request) -> dict[str, Any]:
         },
         "saved": auth.saved_uids(user["id"]),
         "watched": auth.watched_uids(user["id"]),
+        "history": auth.recent_searches(user["id"]),
         "quota": auth.quota(user, ""),
     }
 
@@ -871,6 +872,33 @@ def add_watch(body: UidsIn, request: Request) -> dict[str, Any]:
 @app.delete("/api/watch/{uid}")
 def remove_watch(uid: str, request: Request) -> dict[str, Any]:
     return remove_from_list("watch", uid, request)
+
+
+class SearchIn(BaseModel):
+    q: str = Field("", max_length=200)
+    params: str = Field("", max_length=500)
+
+
+@app.post("/api/history")
+def remember_search(body: SearchIn, request: Request) -> dict[str, Any]:
+    """Remember a search. Fire-and-forget from the page's point of view.
+
+    Recorded here rather than inside /api/search so that the search itself
+    stays a plain GET that costs nothing and needs no token: a signed-out
+    visitor's queries are not ours to keep, and a search must not wait on a
+    write to a second database before it can show results.
+    """
+    user = signed_in(request)
+    auth.record_search(user["id"], body.q, body.params)
+    return {"history": auth.recent_searches(user["id"])}
+
+
+@app.delete("/api/history")
+def forget_search(request: Request, q: str = "") -> dict[str, Any]:
+    """Drop one search, or the whole history when `q` is absent."""
+    user = signed_in(request)
+    auth.forget_searches(user["id"], q)
+    return {"history": auth.recent_searches(user["id"])}
 
 
 @app.get("/api/programs")
