@@ -1,0 +1,285 @@
+/* Kounsly — the account page.
+ *
+ * Built out of the components the catalogue already has: .card and .fact for a
+ * programme, .ob-opt for a choice, .toggle for a switch, .btn for an action.
+ * Nothing here restyles those — the saved list has to look like the results
+ * list, because it is the same programme seen twice.
+ *
+ * Only two things are genuinely new: the two-column shell (which mirrors .cols,
+ * with the account's own rail where the filters sit) and the destructive
+ * colour, because deleting an account is the first irreversible thing the site
+ * has ever offered and the palette had no red in it.
+ */
+
+:root{ --bad:#B4322F; --bad-soft:#FBE9E8 }
+:root[data-theme="dark"]{ --bad:#F0817C; --bad-soft:rgba(240,129,124,.14) }
+
+/* The account replaces the search, rather than living under it: this is the
+   one place on the site that is not about the catalogue. */
+body[data-view="account"] .hero,
+body[data-view="account"] .cols{ display:none }
+#account[hidden]{ display:none }
+
+.account{
+  display:grid;grid-template-columns:236px 1fr;gap:22px;
+  padding:28px 0 96px;align-items:start;
+}
+@media (max-width:760px){ .account{ grid-template-columns:1fr } }
+
+/* ---------- rail ---------- */
+.ac-rail{
+  position:sticky;top:74px;background:var(--panel);border:1px solid var(--brd);
+  border-radius:16px;padding:16px 12px 12px;box-shadow:var(--shadow);
+}
+@media (max-width:760px){ .ac-rail{ position:static } }
+.ac-who{ padding:0 4px 14px;margin-bottom:8px;border-bottom:1px solid var(--brd) }
+.ac-who .mail{ font-size:13.5px;font-weight:600;overflow-wrap:anywhere }
+.ac-who .since{ font-size:12px;color:var(--faint);margin-top:3px }
+.ac-plan{
+  display:inline-block;margin-top:9px;font-size:10.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);background:var(--panel-2);
+  border:1px solid var(--brd);border-radius:999px;padding:4px 9px;
+}
+.ac-nav{
+  display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  padding:9px 10px;border-radius:9px;border:1px solid transparent;background:none;
+  color:var(--muted);font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+}
+.ac-nav:hover{ background:var(--panel-2);color:var(--text) }
+.ac-nav[aria-current="true"]{ background:var(--accent-soft);color:var(--accent-ink) }
+.ac-nav .n{
+  margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:12px;color:var(--faint);
+}
+.ac-nav[aria-current="true"] .n{ color:var(--accent-ink) }
+.ac-back{
+  margin-top:10px;padding-top:12px;border-top:1px solid var(--brd);border-radius:0;
+  color:var(--accent-ink);
+}
+
+/* ---------- sections ---------- */
+.ac-main{ min-width:0;display:flex;flex-direction:column;gap:18px }
+.ac-head h1{
+  font-family:var(--sans);font-size:clamp(24px,3.4vw,31px);font-weight:700;
+  letter-spacing:-.02em;line-height:1.15;margin:0;
+}
+.ac-head p{ margin:8px 0 0;color:var(--muted);font-size:14.5px;line-height:1.55;max-width:60ch }
+.ac-pane{
+  background:var(--panel);border:1px solid var(--brd);border-radius:16px;
+  padding:20px 22px;box-shadow:var(--shadow);
+}
+.ac-pane > h2{ font-size:1.05rem;font-weight:700;letter-spacing:-.015em;margin:0 }
+.ac-pane > .lede{ margin:5px 0 18px;color:var(--muted);font-size:13.5px;line-height:1.55;max-width:62ch }
+.ac-rule{ height:1px;background:var(--brd);border:0;margin:20px 0 }
+.ac-lbl{
+  display:block;margin:0 0 9px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);font-weight:700;
+}
+.ac-hint{ font-size:12.5px;color:var(--faint);margin:8px 0 0;line-height:1.5 }
+.ac-row{ display:flex;flex-wrap:wrap;gap:16px 22px }
+.ac-fld{ flex:1 1 190px;min-width:0 }
+.ac-fld.narrow{ flex:0 1 140px }
+
+.ac-pane input[type="text"],
+.ac-pane input[type="number"],
+.ac-pane textarea{
+  width:100%;padding:10px 13px;border-radius:11px;border:1px solid var(--brd-2);
+  background:var(--panel-2);color:var(--text);font:inherit;font-size:.93rem;
+}
+.ac-pane input:hover,.ac-pane textarea:hover{ border-color:var(--accent) }
+.ac-pane input:focus,.ac-pane textarea:focus,.ac-pane select:focus{
+  outline:2px solid var(--accent);outline-offset:1px;border-color:transparent;
+}
+.ac-pane textarea{ resize:vertical;min-height:74px;line-height:1.55 }
+.ac-pane input.num{ font-family:var(--mono);font-variant-numeric:tabular-nums }
+.ac-opts{ display:flex;flex-wrap:wrap;gap:7px }
+.ac-opts .ob-opt.lvl{ min-width:50px;text-align:center;font-family:var(--mono) }
+
+/* how much of the profile is filled in, and what that buys */
+.ac-meter{ display:flex;align-items:center;gap:16px;flex-wrap:wrap }
+.ac-ring{
+  --p:0;width:50px;height:50px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--accent) calc(var(--p) * 1%),var(--brd) 0);position:relative;
+}
+.ac-ring::after{ content:"";position:absolute;inset:5px;border-radius:50%;background:var(--panel) }
+.ac-ring b{ position:relative;z-index:1;font-family:var(--mono);font-size:12.5px }
+.ac-meter .txt{ flex:1 1 240px;min-width:0 }
+.ac-meter .txt b{ font-size:14.5px }
+.ac-meter .txt p{ margin:3px 0 0;font-size:13px;color:var(--muted);line-height:1.5 }
+
+/* education: a ladder, not a list — school is inside bachelor is inside master */
+.ac-edu{
+  display:flex;align-items:center;gap:11px;flex-wrap:wrap;width:100%;text-align:left;
+  padding:11px 13px;border:1px solid var(--brd-2);border-radius:12px;
+  background:var(--panel);color:var(--text);font:inherit;cursor:pointer;
+}
+.ac-edu + .ac-edu{ margin-top:8px }
+.ac-edu[aria-pressed="true"]{ background:var(--accent-soft);border-color:transparent }
+.ac-tick{
+  width:21px;height:21px;flex:none;border-radius:7px;border:1.5px solid var(--brd-2);
+  background:var(--panel);display:grid;place-items:center;color:transparent;font-size:12px;line-height:1;
+}
+.ac-edu[aria-pressed="true"] .ac-tick{ background:var(--accent);border-color:transparent;color:#fff }
+.ac-edu .nm{ font-weight:600;font-size:.9rem }
+.ac-edu .sub{ font-size:12.5px;color:var(--muted);margin-left:auto }
+
+/* the mark, and the approximation it allows — never written back as fact */
+.ac-gpa{ display:flex;gap:12px;flex-wrap:wrap;align-items:center }
+.ac-conv{
+  flex:1 1 250px;font-size:13.5px;line-height:1.45;background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);border-radius:12px;padding:10px 13px;
+}
+.ac-conv b{ font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700 }
+.ac-conv small{ display:block;color:var(--muted);font-size:11.5px;margin-top:3px }
+
+/* ---------- the saved list, as something to work with ---------- */
+.ac-tools{ display:flex;gap:10px;flex-wrap:wrap;align-items:center }
+.ac-tools .sp{ flex:1 }
+.ac-tools .count{ font-size:14px;color:var(--muted) }
+.ac-tools .count b{ color:var(--text) }
+.ac-list{ display:flex;flex-direction:column;gap:13px }
+.ac-item{ display:flex;flex-direction:column;gap:0 }
+/* the card and its strip are one object: the strip is where the reader's own
+   decisions live, and a gap between them would read as two separate things */
+.ac-item .card{ margin:0;border-bottom-left-radius:0;border-bottom-right-radius:0 }
+.ac-item .card:hover{ transform:none }
+/* dropped programmes stay in the list and stay readable — this is a decision
+   the reader made, not something we hide for them */
+.ac-item[data-state="dropped"] .card{ opacity:.55 }
+.ac-strip{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:-1px 0 0;padding:10px 16px;background:var(--panel-2);
+  border:1px solid var(--brd);border-top:0;border-radius:0 0 15px 15px;
+}
+.ac-state{
+  font:inherit;font-size:12px;font-weight:650;cursor:pointer;white-space:nowrap;
+  border:1px solid var(--brd-2);background:var(--panel);color:var(--muted);
+  border-radius:999px;padding:4px 11px;
+}
+.ac-state:hover{ border-color:var(--accent) }
+.ac-state[aria-pressed="true"]{ border-color:transparent;font-weight:700 }
+.ac-state[data-v="applying"][aria-pressed="true"]{ background:var(--good-soft);color:var(--good) }
+.ac-state[data-v="thinking"][aria-pressed="true"]{ background:var(--accent-soft);color:var(--accent-ink) }
+.ac-state[data-v="dropped"][aria-pressed="true"]{ background:var(--panel-2);color:var(--faint);border-color:var(--brd-2) }
+.ac-notebtn{
+  margin-left:auto;border:0;background:none;padding:0;color:var(--accent-ink);
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+}
+.ac-notebtn:hover{ text-decoration:underline }
+/* font and colour spelled out: this textarea sits outside .ac-pane, and a bare
+   textarea inherits neither — the note rendered in the browser's monospace
+   default, in a grey that was barely legible on the dark theme. */
+.ac-note{
+  margin:10px 0 0;width:100%;padding:10px 13px;font:inherit;font-size:13.5px;line-height:1.55;
+  color:var(--text);resize:vertical;min-height:74px;
+  background:var(--panel);border:1px solid var(--brd-2);border-left:3px solid var(--warn);
+  border-radius:0 10px 10px 0;
+}
+.ac-note[readonly]{ background:transparent;border-color:transparent;border-left-color:var(--warn);cursor:text }
+.ac-saving{ font-size:12px;color:var(--faint);align-self:center }
+
+/* ---------- deadlines ---------- */
+.ac-dl{ display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--brd) }
+.ac-dl:last-child{ border-bottom:0 }
+.ac-dl .when{ flex:0 0 92px;font-family:var(--mono);font-variant-numeric:tabular-nums }
+.ac-dl .when b{ display:block;font-size:15px }
+.ac-dl .when span{ color:var(--faint);font-size:11.5px }
+.ac-dl .body{ flex:1;min-width:0 }
+.ac-dl .t{ font-weight:650;font-size:14.5px }
+.ac-dl .s{ font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5 }
+/* the reader's own date, marked the same way it is marked on the card */
+.ac-dl.mine{ background:var(--accent-soft);border-radius:11px;padding:12px 13px;border-bottom:0;margin:2px 0 }
+.ac-dl.mine .when b{ color:var(--accent-ink) }
+.ac-who-tag{
+  display:inline-block;margin-top:6px;font-size:11px;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--accent-ink);font-weight:700;
+}
+
+/* ---------- questions left ---------- */
+.ac-bar{ height:9px;border-radius:999px;background:var(--panel-2);overflow:hidden;margin:14px 0 9px }
+.ac-bar i{ display:block;height:100%;background:var(--grad);border-radius:999px }
+.ac-barfoot{ display:flex;justify-content:space-between;font-size:13px;color:var(--muted) }
+.ac-barfoot b{ color:var(--text);font-family:var(--mono);font-variant-numeric:tabular-nums }
+
+/* ---------- data and security ---------- */
+.ac-kv{ display:grid;grid-template-columns:170px 1fr auto;gap:14px;align-items:center;padding:11px 0 }
+.ac-kv + .ac-kv{ border-top:1px dashed var(--brd) }
+.ac-kv .k{ font-size:.82rem;color:var(--faint);font-weight:600 }
+.ac-kv .v{ font-size:.94rem;overflow-wrap:anywhere }
+@media (max-width:700px){
+  .ac-kv{ grid-template-columns:1fr;gap:6px }
+  .ac-kv .k{ font-size:.75rem;text-transform:uppercase;letter-spacing:.05em }
+}
+.ac-pane.danger{ border-color:color-mix(in srgb,var(--bad) 32%,var(--brd)) }
+.ac-pane.danger > h2{ color:var(--bad) }
+.btn.danger{ border-color:color-mix(in srgb,var(--bad) 45%,transparent);color:var(--bad);background:transparent }
+.btn.danger:hover{ background:var(--bad-soft);border-color:var(--bad) }
+.ac-confirm{
+  display:none;margin-top:16px;padding:15px;border:1px solid var(--bad);
+  border-radius:12px;background:var(--bad-soft);
+}
+.ac-confirm.on{ display:block }
+.ac-confirm p{ margin:0 0 12px;font-size:13.5px;line-height:1.55 }
+.ac-confirm input{ max-width:250px;font-family:var(--mono);letter-spacing:.12em;background:var(--panel) }
+.ac-confirm .acts{ display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center }
+
+.ac-quiet{
+  border:0;background:none;padding:0;color:var(--muted);
+  font:inherit;font-size:.84rem;text-decoration:underline;cursor:pointer;
+}
+.ac-quiet:hover{ color:var(--text) }
+.ac-empty{
+  background:var(--panel);border:1px solid var(--brd);border-radius:15px;
+  padding:40px 24px;text-align:center;color:var(--muted);box-shadow:var(--shadow);
+}
+.ac-saved-msg{ font-size:13px;color:var(--good);font-weight:600 }
+
+/* ---------- the account button in the header ---------- */
+.acct-menu .n{
+  margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:.78rem;color:var(--faint);
+}
+.acct-menu button{ display:flex;align-items:center;gap:9px }
+.acct-sep{ height:1px;background:var(--brd);margin:5px 4px }
+/* The allowance, where someone already goes to look at their account —
+   shown before the wall, never only at it. */
+.acct-quota{ padding:9px 10px 4px }
+.acct-quota .l{ display:flex;justify-content:space-between;gap:10px;font-size:.78rem;color:var(--muted);margin-bottom:6px }
+.acct-quota .l b{ font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text) }
+.acct-quota .ac-bar{ margin:0 }
+
+/* ---------- past searches, under the box they were typed into ---------- */
+.sbox{ position:relative;max-width:660px;margin:28px auto 0 }
+.sbox .searchbox{ margin:0 }
+.sugg{
+  position:absolute;left:0;right:0;top:calc(100% + 8px);z-index:30;text-align:left;
+  background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:6px;
+  box-shadow:0 20px 44px -22px rgba(10,11,17,.45), var(--shadow);
+}
+.sugg[hidden]{ display:none }
+.sugg .head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 10px 7px;border-bottom:1px solid var(--brd);margin-bottom:4px;
+}
+.sugg .head b{ font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700 }
+.sugg-row{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:9px 10px;border:0;border-radius:9px;background:none;color:var(--text);
+  font:inherit;font-size:14px;cursor:pointer;
+}
+.sugg-row:hover,.sugg-row:focus-visible{ background:var(--panel-2) }
+.sugg-row .ic{ flex:none;color:var(--faint);font-size:13px;line-height:1 }
+.sugg-row .q{ flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.sugg-row .when{ font-family:var(--mono);font-size:11.5px;color:var(--faint);white-space:nowrap }
+.sugg-row .x{
+  border:0;background:none;color:var(--faint);font-size:13px;line-height:1;
+  padding:2px 4px;cursor:pointer;opacity:0;
+}
+.sugg-row:hover .x,.sugg-row:focus-within .x{ opacity:1 }
+.sugg-row .x:hover{ color:var(--warn) }
+@media (hover:none){ .sugg-row .x{ opacity:1 } }
+.sugg .foot{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 10px 4px;border-top:1px solid var(--brd);margin-top:4px;
+}
+.sugg .foot span{ font-size:11.5px;color:var(--faint) }

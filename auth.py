@@ -28,7 +28,13 @@ ANON_ASKS = int(os.getenv("KOUNSLY_ANON_ASKS", "3"))            # per device, li
 FREE_ASKS_PER_MONTH = int(os.getenv("KOUNSLY_FREE_ASKS", "15"))
 PRO_ASKS_PER_MONTH = int(os.getenv("KOUNSLY_PRO_ASKS", "600"))  # a ceiling on abuse, not a plan limit
 
-PROFILE_FIELDS = ("citizenship", "status", "education", "ielts", "toefl")
+# The four the onboarding asks, plus what the account page adds. Order matters
+# only for the export file, which is read by people.
+PROFILE_FIELDS = (
+    "citizenship", "status", "education", "ielts", "toefl",
+    "field", "institution", "grad_year", "gpa", "gpa_scale", "english_self",
+    "intake", "want_level", "budget_max",
+)
 
 # Which values we accept for the enumerated profile fields. A free-text
 # citizenship would reach the assistant's prompt, so the set is closed here.
@@ -36,7 +42,22 @@ ALLOWED = {
     "citizenship": {"UA", "EU", "OTHER"},
     "status": {"none", "protection"},
     "education": {"school", "bachelor", "master"},
+    "gpa_scale": {"100", "12", "5", "4"},
+    "english_self": {"A2", "B1", "B2", "C1", "C2"},
+    "intake": {"2026-fall", "2027-spring", "2027-fall", "undecided"},
+    "want_level": {"bachelor", "master", "any"},
 }
+
+# The two fields a person writes themselves, and the only ones on the profile
+# that are not from a closed list. Capped because both reach the assistant's
+# prompt: a profile is context, not an input channel.
+FREE_TEXT = {"field": 120, "institution": 160}
+
+# What the assistant is told. The mark is left out on purpose: it is stored with
+# its scale and converted only as an on-screen approximation, and handing a
+# model "gpa 91" invites it to state a German grade as if a university had said
+# so. Same reason `status` is here but nothing is derived from it.
+PROMPT_FIELDS = ("citizenship", "status", "education", "ielts", "toefl", "field", "english_self")
 
 
 def accounts_available() -> bool:
@@ -193,7 +214,9 @@ def update_profile(user_id: str, data: dict[str, Any]) -> dict[str, Any]:
         value = data[field]
         if isinstance(value, str):
             value = value.strip() or None
-        if field in ALLOWED and value is not None and value not in ALLOWED[field]:
+        if field in FREE_TEXT and isinstance(value, str):
+            value = value[: FREE_TEXT[field]]
+        if field in ALLOWED and value is not None and str(value) not in ALLOWED[field]:
             continue
         sets.append(f"{field} = %s")
         params.append(value)
@@ -208,10 +231,14 @@ def update_profile(user_id: str, data: dict[str, Any]) -> dict[str, Any]:
 
 
 def profile_of(user: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
-    """The profile in the shape the assistant's prompt expects, or None."""
+    """The profile in the shape the assistant's prompt expects, or None.
+
+    A deliberately smaller set than the profile page collects — see
+    PROMPT_FIELDS for which parts of it the model is not told, and why.
+    """
     if not user:
         return None
-    told = {f: user.get(f) for f in PROFILE_FIELDS if user.get(f) not in (None, "")}
+    told = {f: user.get(f) for f in PROMPT_FIELDS if user.get(f) not in (None, "")}
     return {k: str(v) for k, v in told.items()} or None
 
 
@@ -220,6 +247,47 @@ def profile_of(user: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
 def saved_uids(user_id: str) -> list[str]:
     rows = query("SELECT uid FROM saved_program WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
     return [r["uid"] for r in rows]
+
+
+SAVED_STATES = {"applying", "thinking", "dropped"}
+NOTE_MAX = 2000
+
+
+def saved_rows(user_id: str) -> dict[str, dict[str, Any]]:
+    """Everything the reader added to a saved programme, keyed by uid.
+
+    Separate from saved_uids() because the order of the list and the writing on
+    it are different questions, and the card view needs only the first.
+    """
+    rows = query(
+        "SELECT uid, note, state FROM saved_program WHERE user_id = %s ORDER BY created_at DESC",
+        (user_id,),
+    )
+    return {r["uid"]: {"note": r["note"] or "", "state": r["state"]} for r in rows}
+
+
+def annotate_saved(user_id: str, uid: str, data: dict[str, Any]) -> None:
+    """Set the note and/or the state on one saved programme.
+
+    Only touches a row that is already saved: annotating something that was
+    never starred would quietly add it to the list, and a note is not a save.
+    """
+    sets, params = [], []
+    if "note" in data:
+        note = (data["note"] or "").strip()[:NOTE_MAX]
+        sets.append("note = %s")
+        params.append(note or None)
+    if "state" in data:
+        state = data["state"] or None
+        if state is not None and state not in SAVED_STATES:
+            state = None
+        sets.append("state = %s")
+        params.append(state)
+    if not sets:
+        return
+    params += [user_id, uid]
+    query(f"UPDATE saved_program SET {', '.join(sets)} WHERE user_id = %s AND uid = %s",
+          tuple(params), write=True)
 
 
 def watched_uids(user_id: str) -> list[str]:
@@ -253,7 +321,10 @@ def remove(kind: str, user_id: str, uid: str) -> None:
 
 # ---------- search history ----------
 
-RECENT_SEARCHES = 8
+# How many the browser gets. Was eight, when this was eight chips under the
+# search box; the panel that replaced them shows a few and expands, so it needs
+# more than fits on one row but nowhere near the whole history.
+RECENT_SEARCHES = 25
 
 
 def record_search(user_id: str, q: str, params: str = "") -> None:
@@ -282,16 +353,24 @@ def record_search(user_id: str, q: str, params: str = "") -> None:
         print(f"search not recorded: {str(e)[:160]}")
 
 
-def recent_searches(user_id: str) -> list[dict[str, Any]]:
+def recent_searches(user_id: str, limit: Optional[int] = RECENT_SEARCHES) -> list[dict[str, Any]]:
+    """The reader's own searches, newest first.
+
+    `limit=None` is the export: the panel under the search box shows the
+    handful you would plausibly go back to, but "give me my data" means all of
+    it, not the same eight.
+    """
+    sql = "SELECT q, params, created_at FROM search_event WHERE user_id = %s ORDER BY created_at DESC"
+    params: tuple = (user_id,)
+    if limit is not None:
+        sql += " LIMIT %s"
+        params += (limit,)
     try:
-        rows = query(
-            "SELECT q, params FROM search_event WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
-            (user_id, RECENT_SEARCHES),
-        )
+        rows = query(sql, params)
     except Exception as e:  # noqa: BLE001
         print(f"history unavailable: {str(e)[:160]}")
         return []
-    return [{"q": r["q"], "params": r["params"] or ""} for r in rows]
+    return [{"q": r["q"], "params": r["params"] or "", "at": str(r["created_at"])} for r in rows]
 
 
 def forget_searches(user_id: str, q: str = "") -> None:
@@ -304,6 +383,54 @@ def forget_searches(user_id: str, q: str = "") -> None:
         query("DELETE FROM search_event WHERE user_id = %s AND q = %s", (user_id, q[:200]), write=True)
     else:
         query("DELETE FROM search_event WHERE user_id = %s", (user_id,), write=True)
+
+
+# ---------- taking your data, and leaving ----------
+
+def export_data(user: dict[str, Any]) -> dict[str, Any]:
+    """Everything we hold about this person, in one readable file.
+
+    Written from the same tables the product reads, not from a summary: if a
+    row is not in here, we do not have it. That is the claim the button makes,
+    and it is only true as long as this function stays the whole of it.
+    """
+    user_id = user["id"]
+    saved = saved_rows(user_id)
+    return {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "account": {
+            "email": user.get("email"),
+            "created_at": str(user.get("created_at") or ""),
+            "plan": user.get("plan", "free"),
+            "lang": user.get("lang", "uk"),
+        },
+        "profile": {f: _plain(user.get(f)) for f in PROFILE_FIELDS},
+        "saved": [{"uid": uid, **row} for uid, row in saved.items()],
+        "deadline_reminders": watched_uids(user_id),
+        "searches": recent_searches(user_id, limit=None),
+        "questions_this_month": quota(user, "").get("used", 0),
+    }
+
+
+def _plain(value: Any) -> Any:
+    """JSON-safe: psycopg hands back Decimal for numeric columns."""
+    from decimal import Decimal
+
+    return float(value) if isinstance(value, Decimal) else value
+
+
+def delete_account(user_id: str) -> None:
+    """Erase the person's data. Not reversible, and there is no archived copy.
+
+    Deletes our own row and lets `on delete cascade` take the saved list, the
+    reminders, the history and the question counter with it. The row in
+    auth.users is Supabase's and stays: removing it needs a service_role key,
+    and keeping a key that can read every account in the project — on the
+    server, for one button — is a worse trade than an orphaned identity row
+    that now points at nothing. The interface says "delete all your data"
+    rather than "delete your account" for exactly this reason.
+    """
+    query("DELETE FROM app_user WHERE id = %s", (user_id,), write=True)
 
 
 # ---------- the meter ----------

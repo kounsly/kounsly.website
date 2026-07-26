@@ -788,10 +788,26 @@ class ProfileIn(BaseModel):
     ielts: Optional[float] = Field(None, ge=0, le=9)
     toefl: Optional[int] = Field(None, ge=0, le=120)
     lang: Optional[str] = None
+    # The rest of the profile. Bounds here are sanity, not policy: they exist so
+    # a typo cannot store a graduation year of 20255 or a mark of a million.
+    field: Optional[str] = Field(None, max_length=120)
+    institution: Optional[str] = Field(None, max_length=160)
+    grad_year: Optional[int] = Field(None, ge=1950, le=2100)
+    gpa: Optional[float] = Field(None, ge=0, le=100)
+    gpa_scale: Optional[str] = None
+    english_self: Optional[str] = None
+    intake: Optional[str] = None
+    want_level: Optional[str] = None
+    budget_max: Optional[int] = Field(None, ge=0, le=200000)
 
 
 class UidsIn(BaseModel):
     uids: list[str] = Field(default_factory=list, max_length=200)
+
+
+class SavedNoteIn(BaseModel):
+    note: Optional[str] = Field(None, max_length=auth.NOTE_MAX)
+    state: Optional[str] = None
 
 
 def signed_in(request: Request) -> dict[str, Any]:
@@ -807,10 +823,15 @@ def me_payload(user: dict[str, Any], request: Request) -> dict[str, Any]:
             "id": str(user["id"]),
             "email": user.get("email"),
             "plan": user.get("plan", "free"),
+            "created_at": str(user.get("created_at") or ""),
             "onboarded": bool(user.get("onboarded")),
             "profile": {f: user.get(f) for f in auth.PROFILE_FIELDS},
         },
         "saved": auth.saved_uids(user["id"]),
+        # The writing on the saved list, keyed by uid. Sent with everything else
+        # rather than fetched when the account page opens: it is two short
+        # columns, and one round trip that already happens beats a second one.
+        "saved_meta": auth.saved_rows(user["id"]),
         "watched": auth.watched_uids(user["id"]),
         "history": auth.recent_searches(user["id"]),
         "quota": auth.quota(user, ""),
@@ -839,6 +860,30 @@ def save_profile(body: ProfileIn, request: Request) -> dict[str, Any]:
     user = signed_in(request)
     updated = auth.update_profile(user["id"], body.model_dump(exclude_unset=True))
     return me_payload(updated, request)
+
+
+@app.get("/api/me/export")
+def export_me(request: Request) -> JSONResponse:
+    """Everything we hold about this person, as a file they can keep.
+
+    Content-Disposition so the browser saves it instead of rendering JSON in a
+    tab: this is meant to be a copy of your data, and a copy you have to
+    right-click to keep is a worse promise.
+    """
+    user = signed_in(request)
+    stamp = date.today().isoformat()
+    return JSONResponse(
+        auth.export_data(user),
+        headers={"Content-Disposition": f'attachment; filename="kounsly-{stamp}.json"'},
+    )
+
+
+@app.delete("/api/me")
+def delete_me(request: Request) -> dict[str, Any]:
+    """Erase this person's data. See auth.delete_account for what stays and why."""
+    user = signed_in(request)
+    auth.delete_account(user["id"])
+    return {"deleted": True}
 
 
 def add_to_list(kind: str, body: UidsIn, request: Request) -> dict[str, Any]:
@@ -870,6 +915,18 @@ def add_saved(body: UidsIn, request: Request) -> dict[str, Any]:
 @app.delete("/api/saved/{uid}")
 def remove_saved(uid: str, request: Request) -> dict[str, Any]:
     return remove_from_list("saved", uid, request)
+
+
+@app.patch("/api/saved/{uid}")
+def annotate_saved(uid: str, body: SavedNoteIn, request: Request) -> dict[str, Any]:
+    """The reader's own note on a saved programme, and where they are with it.
+
+    PATCH rather than PUT: the note and the status are set from two different
+    controls, and sending one must not blank the other.
+    """
+    user = signed_in(request)
+    auth.annotate_saved(user["id"], uid, body.model_dump(exclude_unset=True))
+    return me_payload(user, request)
 
 
 @app.post("/api/watch")

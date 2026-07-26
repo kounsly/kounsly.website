@@ -24,6 +24,20 @@ create table if not exists app_user (
   toefl         integer,
   onboarded     boolean not null default false,
 
+  -- The rest of the profile, added in migrations/002_account.sql. Each of these
+  -- is read by something: the last diploma and the mark feed the assistant and
+  -- the "do I qualify" arithmetic, the last three are the opening position of
+  -- the filters. See that file for why "languages I speak" is not here.
+  field         text,          -- speciality of the last diploma
+  institution   text,
+  grad_year     integer,
+  gpa           numeric(5,2),
+  gpa_scale     text,          -- 100 | 12 | 5 | 4 — a mark is meaningless without it
+  english_self  text,          -- A2 | B1 | B2 | C1 | C2, self-assessed
+  intake        text,          -- 2026-fall | 2027-spring | 2027-fall | undecided
+  want_level    text,          -- bachelor | master | any
+  budget_max    integer,       -- euros per year; 0 means "free only"
+
   lang          text not null default 'uk',
   plan          text not null default 'free'    -- free | pro
 );
@@ -32,10 +46,16 @@ create table if not exists app_user (
 -- foreign key: the catalogue is rebuilt from scratch on every data refresh, and
 -- a programme disappearing from a source must not delete a person's list. The
 -- API resolves uids at read time and simply omits ones it can no longer find.
+-- `note` and `state` are what turn this from a filter into a working list: what
+-- the reader worked out about a programme, and whether they are actually going
+-- for it. The note inherits uid's rule — it outlives the programme's row in the
+-- catalogue, because it is the reader's writing, not ours.
 create table if not exists saved_program (
   user_id    uuid not null references app_user(id) on delete cascade,
   uid        text not null,
   created_at timestamptz not null default now(),
+  note       text,
+  state      text check (state is null or state in ('applying', 'thinking', 'dropped')),
   primary key (user_id, uid)
 );
 

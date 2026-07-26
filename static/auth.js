@@ -33,6 +33,7 @@
     uk: {
       signin: "Увійти", signout: "Вийти", account: "Акаунт",
       saved_list: "Збережені", profile: "Мій профіль",
+      deadlines_list: "Дедлайни", asks_month: "Питань цього місяця",
       g_save_t: "Збережи цю програму",
       g_save_b: "Створи акаунт — і твій список буде на всіх пристроях, разом із дедлайнами.",
       g_watch_t: "Нагадаємо про дедлайн",
@@ -77,6 +78,7 @@
     en: {
       signin: "Sign in", signout: "Sign out", account: "Account",
       saved_list: "Saved", profile: "My profile",
+      deadlines_list: "Deadlines", asks_month: "Questions this month",
       g_save_t: "Save this programme",
       g_save_b: "Create an account and your list follows you across devices, deadlines included.",
       g_watch_t: "We'll remind you about the deadline",
@@ -916,7 +918,23 @@
       return;
     }
 
+    // The small window is the way into everything the account holds: the list,
+    // the dates, the profile — and the allowance, which used to be visible only
+    // from inside the assistant, i.e. only once it was nearly gone.
     var email = (me.user && me.user.email) || "";
+    var q = me.quota || {};
+    var meter = "";
+    if (q.limit != null) {
+      var used = Math.min(q.used || 0, q.limit);
+      meter =
+        '<div class="acct-sep"></div>' +
+        '<div class="acct-quota">' +
+          '<div class="l"><span>' + esc(T("asks_month")) + "</span>" +
+            "<span><b>" + (q.remaining == null ? "—" : q.remaining) + "</b> / " + q.limit + "</span></div>" +
+          '<div class="ac-bar"><i style="width:' + Math.round((used / q.limit) * 100) + '%"></i></div>' +
+        "</div>";
+    }
+
     slot.innerHTML =
       '<div class="acct">' +
         '<button class="acct-btn" id="acctbtn" aria-haspopup="true">' +
@@ -924,8 +942,11 @@
         "</button>" +
         '<div class="acct-menu" id="acctmenu" hidden>' +
           '<div class="acct-email">' + esc(email) + "</div>" +
-          '<button data-act="saved">' + esc(T("saved_list")) + " (" + me.saved.length + ")</button>" +
+          '<button data-act="saved">' + esc(T("saved_list")) + '<span class="n">' + me.saved.length + "</span></button>" +
+          '<button data-act="deadlines">' + esc(T("deadlines_list")) + '<span class="n">' + (me.watched || []).length + "</span></button>" +
           '<button data-act="profile">' + esc(T("profile")) + "</button>" +
+          meter +
+          '<div class="acct-sep"></div>' +
           // Also the way to *set* a first password: someone who signed up with
           // a code or with Google has never had one, and this is where they
           // would look for it.
@@ -944,9 +965,16 @@
         menu.hidden = true;
         var act = b.getAttribute("data-act");
         if (act === "out") signOut();
-        else if (act === "profile") openOnboarding();
         else if (act === "password") newPasswordStep();
-        else if (act === "saved" && api.onShowSaved) api.onShowSaved();
+        // Profile, saved and deadlines are three views of the account page. It
+        // is not built when accounts are off, so each falls back to what the
+        // menu did before it existed.
+        else if (act === "profile") { if (window.KounslyAccount) window.KounslyAccount.open("profile"); else openOnboarding(); }
+        else if (act === "deadlines") { if (window.KounslyAccount) window.KounslyAccount.open("deadlines"); }
+        else if (act === "saved") {
+          if (window.KounslyAccount) window.KounslyAccount.open("saved");
+          else if (api.onShowSaved) api.onShowSaved();
+        }
       };
     });
   }
@@ -1053,6 +1081,79 @@
     toggleSaved: function (uid) { return toggle("saved", uid); },
     toggleWatched: function (uid) { return toggle("watch", uid); },
     savedUids: function () { return me ? me.saved.slice() : pending().saved.slice(); },
+    watchedUids: function () { return me ? me.watched.slice() : []; },
+
+    /* ---------- the account page ----------
+     *
+     * These are the only writes that are not a star: a profile, a note on a
+     * saved programme, and leaving. Each one absorbs the payload the API
+     * returns, so nothing here has to guess what the row now says.
+     */
+
+    /** Everything the reader added to a saved programme. */
+    savedMeta: function (uid) {
+      var all = (me && me.saved_meta) || {};
+      return all[uid] || { note: "", state: null };
+    },
+
+    saveProfile: function (patch) {
+      if (!me) return Promise.resolve(null);
+      return authFetch("/api/me", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(patch)
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (d) { me = d; emit(); return d; });
+    },
+
+    /** `quiet` absorbs the answer without redrawing. A note is saved when the
+     *  box loses focus, and redrawing there would tear the box the reader is
+     *  still looking at out from under the words they just typed. */
+    annotateSaved: function (uid, patch, quiet) {
+      if (!me) return Promise.resolve(null);
+      return authFetch("/api/saved/" + encodeURIComponent(uid), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(patch)
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (d) { me = d; if (!quiet) emit(); return d; });
+    },
+
+    /** The export is a download, not a fetch: the browser has to save the file,
+     *  and it needs the token, so the request is made here and handed over as a
+     *  blob rather than as a link the browser would open unauthenticated. */
+    exportData: function () {
+      if (!me) return Promise.resolve(null);
+      return authFetch("/api/me/export")
+        .then(function (r) { return r.ok ? r.blob() : Promise.reject(r); })
+        .then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url;
+          a.download = "kounsly-" + new Date().toISOString().slice(0, 10) + ".json";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+          return true;
+        });
+    },
+
+    /** Erase the data and sign out. The sign-out is not optional: leaving a
+     *  session open against a row that no longer exists would recreate an empty
+     *  account on the next request. */
+    deleteAccount: function () {
+      if (!me) return Promise.resolve(null);
+      return authFetch("/api/me", { method: "DELETE" })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function () { signOut(); return true; });
+    },
+
+    /** Run `fn` whenever the account state changes. init() takes the page's own
+     *  listener; this is for anything built after boot. */
+    onChange: function (fn) { if (fn) listeners.push(fn); },
 
     /** Ask for an account for a stated reason, and run `then` once there is
      *  one. Already signed in, `then` runs immediately — callers never have to
@@ -1063,6 +1164,7 @@
     },
     openGate: openGate,
     openProfile: openOnboarding,
+    newPassword: newPasswordStep,
     signOut: signOut,
     /** Redraw everything that depends on the account — the page calls this when
      *  the language changes, since the header and the wall are translated too. */
