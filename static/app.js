@@ -268,7 +268,19 @@
     RS: { uk: "Сербія", en: "Serbia", flag: "🇷🇸" },
     TR: { uk: "Туреччина", en: "Türkiye", flag: "🇹🇷" },
     US: { uk: "США", en: "United States", flag: "🇺🇸" },
-    CA: { uk: "Канада", en: "Canada", flag: "🇨🇦" }
+    CA: { uk: "Канада", en: "Canada", flag: "🇨🇦" },
+    JP: { uk: "Японія", en: "Japan", flag: "🇯🇵" },
+    KR: { uk: "Південна Корея", en: "South Korea", flag: "🇰🇷" },
+    CN: { uk: "Китай", en: "China", flag: "🇨🇳" },
+    TW: { uk: "Тайвань", en: "Taiwan", flag: "🇹🇼" },
+    SG: { uk: "Сінгапур", en: "Singapore", flag: "🇸🇬" },
+    HK: { uk: "Гонконг", en: "Hong Kong", flag: "🇭🇰" },
+    MY: { uk: "Малайзія", en: "Malaysia", flag: "🇲🇾" },
+    AE: { uk: "ОАЕ", en: "United Arab Emirates", flag: "🇦🇪" },
+    QA: { uk: "Катар", en: "Qatar", flag: "🇶🇦" },
+    SA: { uk: "Саудівська Аравія", en: "Saudi Arabia", flag: "🇸🇦" },
+    AU: { uk: "Австралія", en: "Australia", flag: "🇦🇺" },
+    NZ: { uk: "Нова Зеландія", en: "New Zealand", flag: "🇳🇿" }
   };
   function countryName(code) { var c = COUNTRY[code]; return c ? c[lang] || c.en : code; }
   function countryFlag(code) { return (COUNTRY[code] || {}).flag || ""; }
