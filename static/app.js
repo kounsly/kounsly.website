@@ -533,9 +533,13 @@
     var cheap = item.tuition_eur_year != null && item.tuition_eur_year > 0 && item.tuition_eur_year <= 3000;
     var soon = dl && dl.days <= 30;
 
-    var tuitionNote = free
-      ? (item.semester_fee_raw ? "+ " + shortFee(item.semester_fee_raw) + " " + T("per_semester") : "")
-      : (item.tuition_raw && !/^\s*\d/.test(item.tuition_raw) ? item.tuition_raw.slice(0, 40) : "");
+    // shortFee answers null when the source states the fee in prose with no
+    // figure in it, and the note is only ever worth showing when there is a
+    // figure to show: concatenating the null read "+ null / семестр" on the card.
+    var fee = free && item.semester_fee_raw ? shortFee(item.semester_fee_raw) : null;
+    var tuitionNote = fee
+      ? "+ " + fee + " " + T("per_semester")
+      : (!free && item.tuition_raw && !/^\s*\d/.test(item.tuition_raw) ? item.tuition_raw.slice(0, 40) : "");
 
     node.innerHTML =
       saveStar(item.uid) +
@@ -1162,7 +1166,10 @@
     var money = [];
     money.push(T("f_tuition") + ": " + (p.tuition_free === 1 || p.tuition_eur_year === 0
       ? "€0" : (p.tuition_eur_year != null ? "€" + Math.round(p.tuition_eur_year) + " " + T("per_year") : T("not_listed"))));
-    if (p.semester_fee_raw) money.push(T("d_semester") + ": " + shortFee(txt(p, "semester_fee_raw")));
+    // Same as the card: only when there is a figure. A prose fee belongs in the
+    // money section, not in a one-line summary of the numbers.
+    var semesterFee = p.semester_fee_raw ? shortFee(txt(p, "semester_fee_raw")) : null;
+    if (semesterFee) money.push(T("d_semester") + ": " + semesterFee);
     if (p.cost_of_living_eur_month) money.push(T("d_living") + ": ≈ €" + p.cost_of_living_eur_month);
     steps.push({ k: T("st_money"), v: money.join(" · ") });
 
