@@ -1299,7 +1299,12 @@
     renderQuote();
     var left = $("ask-left");
     if (left) paintQuota(left);
-    if (outOfAsks()) lockAsk();
+    // Deliberately not locked up front, even when the allowance is already
+    // spent. Every programme starts with a box you can type into, and the wall
+    // arrives when the question is asked — the counter beside the field has
+    // been saying "0 left" all along, and refusing the box before the question
+    // exists costs us the question itself, which is what gets asked for them
+    // the moment there is an account.
 
     /* The wall, and what it leaves behind. Closing it with the ✕ has to leave
      * the reader somewhere, and an empty box that silently refuses to send is
@@ -1382,9 +1387,10 @@
           answer.innerHTML = linkify(res.d.answer);
           thread.appendChild(answer);
           revealInSheet(answer);
-          // The one just answered was the last one: say so now, on the answer
-          // they are already reading, rather than when they next press send.
-          if (outOfAsks()) lockAsk();
+          // No wall here, even when that was the last free answer. The count
+          // beside the field drops to "залишилось питань: 0" and that is the
+          // whole warning: an answer is a good moment, and interrupting it with
+          // a sign-up box reads as a bill arriving with the meal.
         })
         .catch(function () { wait.remove(); thread.appendChild(el("div", "msg ai err", T("ask_err"))); })
         .finally(function () { asking = false; });
