@@ -1021,8 +1021,15 @@ def assistant_available() -> bool:
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     n = query("SELECT COUNT(*) AS n FROM programs")[0]["n"]
-    return {"ok": True, "programmes": n, "db": "postgres",
-            "assistant": assistant_available(), "accounts": auth.accounts_available()}
+    out = {"ok": True, "programmes": n, "db": "postgres",
+           "assistant": assistant_available(), "accounts": auth.accounts_available()}
+    # Which signing keys this deployment can check, and which the project
+    # publishes. No key material — see token_diagnosis. Here rather than in a
+    # log because "signed in, then immediately not" is the one auth failure that
+    # leaves no trace anyone can look at from outside.
+    if out["accounts"]:
+        out["tokens"] = auth.token_diagnosis()
+    return out
 
 
 LEGAL = ROOT / "legal.html"

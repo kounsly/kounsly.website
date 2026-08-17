@@ -110,22 +110,45 @@ def verify_token(token: str) -> Optional[dict[str, Any]]:
 
     Returns None rather than raising for every failure mode, expired included:
     an unreadable token means "not signed in", which every caller here already
-    handles. Supabase issues ES256 on current projects and HS256 on older ones,
-    so both are accepted — but only the one the project is actually configured
-    for, never "whatever the header says".
+    handles.
+
+    Supabase signs with a key pair on current projects and a shared secret on
+    older ones, and which one is in force is not ours to assume. It used to be
+    decided by whether SUPABASE_JWT_SECRET happened to be set, and that is a
+    trap with no symptom: a secret left over from an older project, on a project
+    that has since moved to ES256, makes every genuine token fail verification.
+    Signing in then works perfectly — Supabase issues the token, the browser
+    stores it — and the very next request is answered "not signed in", so the
+    page drops back to a sign-in button and nothing anywhere says why.
+
+    So the token's own header chooses, and each algorithm is verified only with
+    a key of its own kind: HS256 against the shared secret, ES256/RS256 against
+    the published key set. That is not "whatever the header says" — an ES256
+    token can never be checked against the secret, and an HS256 one can never be
+    checked against a public key, which is the algorithm-confusion attack this
+    shape is usually warned about. Anything else is refused outright.
     """
     import jwt
 
     if not token or not accounts_available():
         return None
     try:
-        options = {"require": ["exp", "sub"]}
         common = dict(audience="authenticated", issuer=f"{SUPABASE_URL}/auth/v1",
-                      options=options, leeway=10)
-        if SUPABASE_JWT_SECRET:
+                      options={"require": ["exp", "sub"]}, leeway=10)
+        alg = (jwt.get_unverified_header(token) or {}).get("alg", "")
+
+        if alg == "HS256":
+            if not SUPABASE_JWT_SECRET:
+                print("token rejected: HS256 token but no SUPABASE_JWT_SECRET is set")
+                return None
             return jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], **common)
-        key = _jwks().get_signing_key_from_jwt(token).key
-        return jwt.decode(token, key, algorithms=["ES256", "RS256"], **common)
+
+        if alg in ("ES256", "RS256"):
+            key = _jwks().get_signing_key_from_jwt(token).key
+            return jwt.decode(token, key, algorithms=["ES256", "RS256"], **common)
+
+        print(f"token rejected: unsupported alg {alg!r}")
+        return None
     except Exception as e:  # noqa: BLE001 — an invalid token is a logged-out user, not an error
         print(f"token rejected: {type(e).__name__}: {str(e)[:120]}")
         return None
@@ -572,6 +595,36 @@ def auth_settings() -> dict[str, Any]:
             # slow is how an outage on their side becomes an outage on ours.
             _settings_at = now
     return _settings
+
+
+def token_diagnosis() -> dict[str, Any]:
+    """How this deployment can verify a token, without revealing any key.
+
+    Here because the failure it describes is invisible from outside: a session
+    that signs in and is refused on the next request looks like broken sign-in
+    and is a key mismatch. `secret_set` is a yes or no, never the secret.
+    """
+    out: dict[str, Any] = {
+        "secret_set": bool(SUPABASE_JWT_SECRET),
+        "published_algorithms": [],
+    }
+    if not SUPABASE_URL:
+        return out
+    try:
+        req = urllib.request.Request(
+            f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+            headers={"apikey": os.getenv("SUPABASE_ANON_KEY") or ""},
+        )
+        with urllib.request.urlopen(req, timeout=4) as response:
+            keys = (json.loads(response.read().decode()) or {}).get("keys") or []
+        out["published_algorithms"] = sorted({k.get("alg", "?") for k in keys})
+    except Exception as e:  # noqa: BLE001
+        out["published_algorithms"] = ["unreadable: " + str(e)[:80]]
+    # Both accepted is the healthy state now: the token's header decides which
+    # key is used. Only a shared-secret-only deployment against a project that
+    # publishes key pairs would have been broken, and that can no longer happen.
+    out["accepts"] = (["HS256"] if SUPABASE_JWT_SECRET else []) + ["ES256", "RS256"]
+    return out
 
 
 def providers() -> list[str]:
