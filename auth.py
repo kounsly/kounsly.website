@@ -18,6 +18,7 @@ import threading
 import time
 import urllib.request
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
@@ -198,6 +199,47 @@ def query(sql: str, params: tuple = (), *, one: bool = False, write: bool = Fals
         return cur.fetchone() if one else cur.fetchall()
 
 
+MIGRATIONS = Path(__file__).resolve().parent / "migrations"
+
+
+def apply_migrations() -> list[str]:
+    """Bring the user database up to the schema this code expects.
+
+    Applied on startup rather than by hand, because by hand is what failed.
+    003 adds saved_program.checklist; the code that selects that column shipped;
+    the column was never added to the project; and from that moment every
+    signed-in reader got a 500 from /api/me. Sign-in itself worked perfectly —
+    Supabase issued the token, the browser stored it — so the page simply went
+    back to showing a sign-in button, and the catalogue looked entirely healthy
+    the whole time. A schema step that a deploy can forget is a schema step that
+    a deploy will forget.
+
+    Every file is written to be idempotent — `add column if not exists`,
+    `create table if not exists`, `drop constraint if exists` before adding one —
+    so running all of them on every boot is a no-op once they are applied.
+
+    Never fatal. The catalogue must not stop serving search because the user
+    database is unreachable or a statement was refused; that is the same rule
+    the rest of this module follows.
+    """
+    if not accounts_available() or not MIGRATIONS.is_dir():
+        return []
+    done = []
+    for path in sorted(MIGRATIONS.glob("*.sql")):
+        sql = path.read_text(encoding="utf-8").strip()
+        if not sql:
+            continue
+        try:
+            with pool().connection() as conn, conn.cursor() as cur:
+                cur.execute(sql)
+            done.append(path.name)
+        except Exception as e:  # noqa: BLE001
+            print(f"migration {path.name} failed: {str(e)[:200]}")
+    if done:
+        print("migrations applied: " + ", ".join(done))
+    return done
+
+
 def ensure_user(claims: dict[str, Any]) -> dict[str, Any]:
     """The app_user row for these claims, created on first sight.
 
@@ -317,13 +359,32 @@ def saved_rows(user_id: str) -> dict[str, dict[str, Any]]:
 
     Separate from saved_uids() because the order of the list and the writing on
     it are different questions, and the card view needs only the first.
+
+    Falls back to the columns that certainly exist if one of the newer ones does
+    not. This is where the missing checklist column turned into a 500 for the
+    whole account, and the account is worth more than any single column on it:
+    a saved list without its notes is degraded, a reader who cannot sign in at
+    all is broken. The migration runs on startup now, so this is a second line
+    rather than the plan.
     """
-    rows = query(
-        "SELECT uid, note, state, checklist FROM saved_program WHERE user_id = %s ORDER BY created_at DESC",
-        (user_id,),
-    )
-    return {r["uid"]: {"note": r["note"] or "", "state": r["state"],
-                       "checklist": r["checklist"]} for r in rows}
+    columns = "uid, note, state, checklist"
+    try:
+        rows = query(
+            f"SELECT {columns} FROM saved_program WHERE user_id = %s ORDER BY created_at DESC",
+            (user_id,),
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"saved_rows falling back to bare columns: {str(e)[:160]}")
+        try:
+            rows = query(
+                "SELECT uid FROM saved_program WHERE user_id = %s ORDER BY created_at DESC",
+                (user_id,),
+            )
+        except Exception as e2:  # noqa: BLE001
+            print(f"saved_rows unavailable: {str(e2)[:160]}")
+            return {}
+    return {r["uid"]: {"note": r.get("note") or "", "state": r.get("state"),
+                       "checklist": r.get("checklist")} for r in rows}
 
 
 def annotate_saved(user_id: str, uid: str, data: dict[str, Any]) -> None:

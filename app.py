@@ -82,6 +82,22 @@ class NoStoreStatic(StaticFiles):
 
 app.mount("/static", NoStoreStatic(directory=ROOT / "static"), name="static")
 
+
+@app.on_event("startup")
+def migrate_user_db() -> None:
+    """Bring the account schema up to what this code selects, before serving.
+
+    Here rather than in a runbook because a runbook step is one a deploy can
+    skip, and skipping this one broke every signed-in reader while leaving the
+    catalogue looking perfectly healthy — see auth.apply_migrations. The call
+    never raises: search must not stop working because the user database is
+    behind or unreachable.
+    """
+    try:
+        auth.apply_migrations()
+    except Exception as e:  # noqa: BLE001
+        print(f"migrations skipped: {str(e)[:200]}")
+
 # Every column is prefixed with the table alias: programs_fts carries columns of
 # the same names, so bare `name` is ambiguous the moment a text query joins it.
 CARD_COLUMNS = [
