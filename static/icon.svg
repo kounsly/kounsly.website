@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Kounsly">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5B57E8"/>
+      <stop offset="0.6" stop-color="#4E7BEF"/>
+      <stop offset="1" stop-color="#5B57E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <path d="M20 15h7v15.5L41.5 15H50L35.2 30.8 50.5 49H42L30.4 34.6 27 38.2V49h-7z" fill="#fff"/>
+</svg>

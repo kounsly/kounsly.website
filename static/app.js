@@ -150,6 +150,12 @@
       ask_wait: "Читаю дані програми", ask_err: "Асистент недоступний. Спробуй ще раз.",
       ask_limit: "Ліміт безкоштовних питань на годину вичерпано.",
       ask_month: "Питання на цей місяць вичерпано. Лічильник оновиться 1 числа.",
+      see_below: "див. нижче", per_month: "на місяць",
+      ask_wall: "Це були твої безкоштовні питання. Зареєструйся — і питай про будь-яку програму далі.",
+      ask_wall_btn: "Зареєструватися",
+      ask_locked_ph: "Зареєструйся, щоб питати далі",
+      lock_filters: "Решта фільтрів — після реєстрації. Пошук за спеціальністю працює й так.",
+      lock_btn: "Зареєструватися",
       save: "Зберегти", saved: "Збережено", save_aria: "Зберегти програму",
       watch: "Нагадати про дедлайн", watching: "Нагадаємо про дедлайн",
       saved_t: "Збережені програми", saved_empty: "Тут поки порожньо — тисни ★ на будь-якій програмі.",
@@ -216,6 +222,12 @@
       ask_wait: "Reading the programme data", ask_err: "Assistant unavailable. Try again.",
       ask_limit: "Hourly limit of free questions reached.",
       ask_month: "You've used this month's questions. The counter resets on the 1st.",
+      see_below: "stated below", per_month: "a month",
+      ask_wall: "That was your last free question. Create an account and keep asking, about any programme.",
+      ask_wall_btn: "Create an account",
+      ask_locked_ph: "Sign in to keep asking",
+      lock_filters: "The rest of the filters come with an account. Searching by subject works either way.",
+      lock_btn: "Create an account",
       save: "Save", saved: "Saved", save_aria: "Save this programme",
       watch: "Remind me about the deadline", watching: "Reminder on",
       saved_t: "Saved programmes", saved_empty: "Nothing here yet — hit ★ on any programme.",
@@ -364,6 +376,37 @@
     [["match", "sort_match"], ["tuition", "sort_tuition"], ["deadline", "sort_deadline"], ["ielts", "sort_ielts"]]
       .forEach(function (p) { s.appendChild(opt(p[0], T(p[1]))); });
     s.value = state.sort;
+  }
+
+  /* ---------- filters a stranger doesn't get yet ----------
+   *
+   * Subject stays open, because it is the question everyone arrives with and
+   * answering it is what makes an account worth making. The rest are drawn,
+   * disabled, and open the wall when pressed — visible on purpose: a greyed
+   * "Країна" says what signing in buys, while a hidden one says nothing.
+   *
+   * Server-side this is not enforced, and does not need to be: /api/search
+   * takes the same parameters it always did. Someone who edits a URL is not the
+   * person this is for.
+   */
+  function filtersLocked() { return !!(A && A.enabled && !A.signedIn()); }
+
+  function applyFilterLocks() {
+    var locked = filtersLocked();
+    document.querySelectorAll(".filters [data-gated]").forEach(function (g) {
+      g.classList.toggle("locked", locked);
+      g.querySelectorAll("select, input").forEach(function (c) { c.disabled = locked; });
+    });
+
+    var box = $("flock");
+    if (!box) return;
+    box.hidden = !locked;
+    if (!locked) { box.innerHTML = ""; return; }
+    box.innerHTML = '<p class="flock-t"></p><button type="button" class="flock-btn"></button>';
+    box.querySelector(".flock-t").textContent = T("lock_filters");
+    var btn = box.querySelector(".flock-btn");
+    btn.textContent = T("lock_btn");
+    btn.onclick = function () { A.openGate("signup", null); };
   }
 
   function applyI18n() {
@@ -605,6 +648,10 @@
     var left = document.getElementById("ask-left");
     if (left) paintQuota(left);
     paintRecent();
+    // Signing in is what unlocks the filter panel, and this runs on every
+    // change to who is looking — including the one that happens without a page
+    // load, when the wall is answered in place.
+    applyFilterLocks();
   }
 
   /* ---------- search history ----------
@@ -890,12 +937,48 @@
     return body ? '<div class="grp"><h3>' + esc(T(titleKey)) + "</h3>" + body + "</div>" : "";
   }
 
+  /* ---------- what a stranger gets ----------
+   *
+   * Two programmes in full, then the wall. Kept in this browser rather than on
+   * the server, and knowingly: /api/program is public, so anyone who wants the
+   * data can still have it. That is the right trade — this is not protecting a
+   * secret, it is choosing the moment to ask, and the moment is after the
+   * catalogue has already answered two real questions.
+   *
+   * A programme already opened never counts twice: coming back to the one you
+   * are still reading must not be what spends your last look.
+   */
+  var VIEWED_KEY = "kounsly.viewed";
+
+  function viewedUids() {
+    try { return JSON.parse(localStorage.getItem(VIEWED_KEY)) || []; } catch (e) { return []; }
+  }
+
+  function rememberViewed(uid) {
+    var seen = viewedUids();
+    if (seen.indexOf(uid) >= 0) return;
+    seen.push(uid);
+    try { localStorage.setItem(VIEWED_KEY, JSON.stringify(seen.slice(-50))); } catch (e) {}
+  }
+
+  function viewAllowed(uid) {
+    if (!A || !A.enabled || A.signedIn()) return true;
+    var seen = viewedUids();
+    var limit = A.anonViews ? A.anonViews() : 2;
+    return seen.indexOf(uid) >= 0 || seen.length < limit;
+  }
+
   function openSheet(uid) {
-    var n = sheetNodes();
     // Remembered for the round trip to Google or Apple: signing in is a full
     // page load, and coming back to a blank home page loses the very programme
-    // they were signing in to save.
+    // they were signing in to save. Set before the wall as well as after it —
+    // the programme they were refused is exactly the one to open on the way
+    // back.
     if (A) A.currentUid = uid;
+    if (!viewAllowed(uid)) { A.openGate("view", function () { openSheet(uid); }); return; }
+    rememberViewed(uid);
+
+    var n = sheetNodes();
     n.wrap.classList.add("open");
     document.body.style.overflow = "hidden";
     n.sheet.innerHTML = '<div class="sheet-body"><div class="skeleton"></div><div class="skeleton"></div></div>';
@@ -923,7 +1006,8 @@
 
     var tiles = [
       tile("f_tuition", money(p, true), free ? " free" : ""),
-      tile("d_semester", p.semester_fee_raw ? shortFee(txt(p, "semester_fee_raw")) : T("not_listed")),
+      tile("d_semester", (p.semester_fee_raw && shortFee(txt(p, "semester_fee_raw"))) ||
+                         (p.semester_fee_raw ? T("see_below") : T("not_listed"))),
       tile("d_living", p.cost_of_living_eur_month ? "≈ €" + p.cost_of_living_eur_month : T("not_listed")),
       tile("f_english", englishLabel(p)),
       tile(p.duration_raw ? "f_duration" : "f_ects", p.duration_raw || p.ects || T("not_listed")),
@@ -988,7 +1072,17 @@
             required: true, figure: true
           }),
           block(p, "d_semester", "semester_fee_raw", { required: true }),
-          block(p, "d_living", "cost_of_living_raw", { required: true }),
+          // The figure and the prose come from different places: the prose is a
+          // named field on the page, the number is whatever figure the extractor
+          // found anywhere in the text. Either can exist without the other, and
+          // when only the number did, this row said "the official page does not
+          // state this" directly under a tile reading "≈ €950". Both were about
+          // the page and only one of them was true.
+          block(p, "d_living", "cost_of_living_raw", {
+            required: true,
+            value: txt(p, "cost_of_living_raw") ||
+                   (p.cost_of_living_eur_month ? "≈ €" + p.cost_of_living_eur_month + " " + T("per_month") : null)
+          }),
           block(p, "d_funding", "scholarships_raw", { required: true })
         ]) +
 
@@ -1133,27 +1227,71 @@
   }
 
   /** The semester contribution field is a paragraph; the tile needs the figure. */
+  /** The figure out of a fee sentence, or nothing.
+   *
+   *  It used to fall back to the first 28 characters and an ellipsis, which put
+   *  "Семестровий внесок у Univers…" in a tile sized for "€172" — a stat tile
+   *  reading as a truncated sentence, with the real answer nowhere in it. There
+   *  is no short honest version of a paragraph, so say where it is instead: the
+   *  full text is already in the money section, a screen further down. */
   function shortFee(text) {
     var m = String(text).match(/([\d][\d.,]*)\s*(?:€|EUR)/i);
-    return m ? "€" + m[1] : String(text).slice(0, 28) + "…";
+    return m ? "€" + m[1] : null;
   }
 
   /* ---------- assistant ---------- */
 
+  /* The conversation is page content; only the box you type into is furniture.
+   *
+   * These used to be one sticky element, and that is what froze the detail
+   * sheet. `.ask` was `position:sticky; bottom:0` with the thread inside it, so
+   * every answer made the sticky block taller — and a bottom-stuck element
+   * taller than its scrollport is pinned by its bottom edge and painted over
+   * everything else. Two questions in, it covered the whole sheet: the
+   * programme text above was unreachable, the top of the conversation had been
+   * pushed off-screen, and scrolling appeared to do nothing at all.
+   *
+   * So the thread sits in normal flow and scrolls with the rest of the sheet,
+   * and only `.ask-bar` — quote, field, hint — stays stuck to the bottom. */
   function askHTML() {
     return '<div class="ask">' +
       '<div class="thread" id="thread"></div>' +
-      '<div class="ask-quote" id="ask-quote"></div>' +
-      '<form class="ask-form" id="ask-form">' +
-        '<input id="ask-input" type="text" autocomplete="off" placeholder="' + esc(T("ask_ph")) + '">' +
-        '<button type="submit">' + esc(T("ask_send")) + "</button>" +
-      "</form>" +
-      '<div class="ask-hint">' + esc(T("ask_hint")) +
-        ' <span class="ask-left" id="ask-left"></span></div>' +
+      '<div class="ask-bar">' +
+        '<div class="ask-quote" id="ask-quote"></div>' +
+        '<form class="ask-form" id="ask-form">' +
+          '<input id="ask-input" type="text" autocomplete="off" placeholder="' + esc(T("ask_ph")) + '">' +
+          '<button type="submit">' + esc(T("ask_send")) + "</button>" +
+        "</form>" +
+        '<div class="ask-hint">' + esc(T("ask_hint")) +
+          ' <span class="ask-left" id="ask-left"></span></div>' +
+      "</div>" +
       "</div>";
   }
 
+  /** Bring a message into view inside the sheet, allowing for the bar parked
+   *  over the bottom of it. scrollIntoView is no good here: the wrapper behind
+   *  the sheet scrolls too, so the browser is free to move that one instead,
+   *  and `block:"nearest"` counts the message as visible when it is sitting
+   *  behind the composer. */
+  function revealInSheet(node) {
+    var body = document.querySelector(".sheet-body");
+    if (!body || !node) return;
+    var bar = body.querySelector(".ask-bar");
+    var pad = (bar ? bar.offsetHeight : 0) + 12;
+    var over = node.getBoundingClientRect().bottom - (body.getBoundingClientRect().bottom - pad);
+    if (over > 0) body.scrollTop += over;
+  }
+
   var selection = null;
+
+  /** Out of free questions, and no account to raise the limit. Read from the
+   *  meter the server keeps rather than counted here: the same device may have
+   *  spent its questions in another tab. */
+  function outOfAsks() {
+    if (!A || !A.enabled || A.signedIn()) return false;
+    var q = A.quota();
+    return !!(q && q.scope === "anon" && q.remaining != null && q.remaining <= 0);
+  }
 
   function wireAsk(p) {
     var form = $("ask-form"), input = $("ask-input"), thread = $("thread");
@@ -1161,13 +1299,52 @@
     renderQuote();
     var left = $("ask-left");
     if (left) paintQuota(left);
+    if (outOfAsks()) lockAsk();
+
+    /* The wall, and what it leaves behind. Closing it with the ✕ has to leave
+     * the reader somewhere, and an empty box that silently refuses to send is
+     * the one thing it must not be: the invitation stays in the conversation,
+     * with the button on it, so the way in is still there after the full-screen
+     * version is gone. */
+    function lockAsk() {
+      input.disabled = true;
+      input.value = "";
+      input.placeholder = T("ask_locked_ph");
+      form.querySelector("button").disabled = true;
+      if ($("ask-wall")) return;
+      var wall = el("div", "msg ai wall");
+      wall.id = "ask-wall";
+      wall.appendChild(el("div", "wall-t", T("ask_wall")));
+      var btn = el("button", "wall-btn", T("ask_wall_btn"));
+      btn.type = "button";
+      btn.onclick = function () { A.openGate("ask", null); };
+      wall.appendChild(btn);
+      thread.appendChild(wall);
+      revealInSheet(wall);
+    }
+
+    function unlockAsk() {
+      var wall = $("ask-wall");
+      if (wall) wall.remove();
+      input.disabled = false;
+      input.placeholder = T("ask_ph");
+      form.querySelector("button").disabled = false;
+    }
+
+    function wall(question, quoted) {
+      lockAsk();
+      A.openGate("ask", function () {
+        unlockAsk();
+        if (question) send(question, quoted);
+      });
+    }
 
     function send(question, quoted) {
       asking = true;
       thread.appendChild(el("div", "msg me", question));
       var wait = el("div", "msg ai dots", T("ask_wait"));
       thread.appendChild(wait);
-      wait.scrollIntoView({ block: "nearest" });
+      revealInSheet(wait);
 
       var body = { uid: p.uid, question: question, selection: quoted, lang: lang };
       if (A) body.anon_id = A.anonId();
@@ -1195,7 +1372,7 @@
               return;
             }
             thread.lastChild.remove();          // take the unanswered question back
-            A.openGate("ask", function () { send(question, quoted); });
+            wall(question, quoted);
             return;
           }
           if (!res.ok || !res.d.answer) { thread.appendChild(el("div", "msg ai err", T("ask_err"))); return; }
@@ -1204,7 +1381,10 @@
           var answer = el("div", "msg ai");
           answer.innerHTML = linkify(res.d.answer);
           thread.appendChild(answer);
-          answer.scrollIntoView({ block: "nearest" });
+          revealInSheet(answer);
+          // The one just answered was the last one: say so now, on the answer
+          // they are already reading, rather than when they next press send.
+          if (outOfAsks()) lockAsk();
         })
         .catch(function () { wait.remove(); thread.appendChild(el("div", "msg ai err", T("ask_err"))); })
         .finally(function () { asking = false; });
@@ -1215,6 +1395,10 @@
       var question = input.value.trim();
       if (!question || asking) return;
       var quoted = selection;
+      // Asked before the round trip, so a question typed with nothing left
+      // opens the wall instead of spending a request to be told 402 — and the
+      // question is kept, to be asked for them once there is an account.
+      if (outOfAsks()) { wall(question, quoted); return; }
       input.value = "";
       selection = null;
       renderQuote();
@@ -1368,6 +1552,15 @@
       });
 
     $("f-free").addEventListener("change", function () { state.free = this.checked; state.page = 1; runSearch(); });
+
+    // A disabled select never sees the click, so the group around it answers
+    // for it. Pressing a locked filter is the clearest statement of intent
+    // there is — it opens the wall rather than doing nothing.
+    document.querySelectorAll(".filters [data-gated]").forEach(function (g) {
+      g.addEventListener("click", function () {
+        if (g.classList.contains("locked") && A) A.openGate("filter", null);
+      });
+    });
     $("reset").addEventListener("click", function () {
       state = { q: "", country: "", area: "", subject: "", level: "", budget: "", free: false, sort: "match", page: 1, ai: true };
       $("q").value = ""; $("f-free").checked = false;
@@ -1386,7 +1579,7 @@
     $("langbtn").addEventListener("click", function () {
       lang = lang === "uk" ? "en" : "uk";
       localStorage.setItem("kounsly.lang", lang);
-      applyI18n(); buildSelects();
+      applyI18n(); buildSelects(); applyFilterLocks();
       if (A) A.refresh();          // the header and the sign-in box are translated too
       if (current) openSheet(current.uid);
       runSearch();
@@ -1451,6 +1644,7 @@
     // After facets, before the first search: the filters have to exist before
     // a profile can preselect anything in them.
     applyProfileDefaults();
+    applyFilterLocks();
     runSearch();
     // Back from Google or Apple: reopen what they were reading.
     var resume = A && A.resumeUid();

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,11 @@ import auth
 
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / "index.html"
+
+# Absolute URLs, for the two files that cannot use relative ones: a sitemap
+# entry and the Sitemap: line in robots.txt are both defined as absolute, and a
+# crawler reading a relative one throws the file away.
+SITE_ORIGIN = os.getenv("KOUNSLY_ORIGIN", "https://kounsly.com").rstrip("/")
 
 # The catalogue lives in Postgres with pgvector. It was a SQLite file until the
 # catalogue reached a size where the old search — every vector in a numpy matrix
@@ -1040,3 +1045,73 @@ def legal() -> FileResponse:
 def index() -> FileResponse:
     # no-store: the page shipped stale once already and cost hours of confusion
     return FileResponse(INDEX, headers={"Cache-Control": "no-store"})
+
+
+ICON = ROOT / "static" / "icon.svg"
+
+# A week. The icon and these two files change roughly never, and unlike the
+# page they carry nothing that goes stale in a way anyone would notice.
+_STATIC_CACHE = {"Cache-Control": "public, max-age=604800"}
+
+
+@app.get("/favicon.ico")
+@app.get("/icon.svg")
+def favicon() -> FileResponse:
+    """The tab icon, at both addresses browsers look for it.
+
+    `/favicon.ico` is requested by every browser on every first visit whether or
+    not the page asks for one, and answering it with the API's JSON 404 put an
+    error in the log for every visitor and left the tab blank. One SVG serves
+    both: the content type is what is read, not the extension.
+    """
+    return FileResponse(ICON, media_type="image/svg+xml", headers=_STATIC_CACHE)
+
+
+@app.get("/robots.txt")
+def robots() -> Response:
+    """Crawlers are welcome everywhere except the API.
+
+    Nothing under /api is a page: indexing it spends the crawl budget for this
+    site on JSON that would never be a useful result.
+    """
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        f"\nSitemap: {SITE_ORIGIN}/sitemap.xml\n"
+    )
+    return Response(body, media_type="text/plain", headers=_STATIC_CACHE)
+
+
+@app.get("/sitemap.xml")
+def sitemap() -> Response:
+    """The three addresses that are real pages.
+
+    Programmes are not in here on purpose. They have no URLs of their own yet —
+    a programme opens in a sheet over the search — so listing them would be
+    listing pages that do not exist. When they get addresses, they belong here.
+    """
+    pages = ["/", "/terms", "/privacy"]
+    urls = "".join(f"<url><loc>{SITE_ORIGIN}{p}</loc></url>" for p in pages)
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return Response(body, media_type="application/xml", headers=_STATIC_CACHE)
+
+
+@app.exception_handler(404)
+def not_found(request: Request, exc: Any) -> Response:
+    """A mistyped address should land on the site, not on the API's error body.
+
+    Everything under /api is answered by a program and keeps its JSON. Anything
+    else was typed or followed by a person, and `{"detail":"Not Found"}` in a
+    browser window is the site looking broken rather than the address being
+    wrong.
+    """
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    # 404, not a redirect: the address really is not a page, and telling a
+    # crawler otherwise gets every typo indexed as a copy of the home page.
+    return FileResponse(INDEX, status_code=404, headers={"Cache-Control": "no-store"})

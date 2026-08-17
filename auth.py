@@ -12,8 +12,11 @@ second service is down, and it means this can ship before the project exists.
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
+import time
+import urllib.request
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 
@@ -24,9 +27,16 @@ DATABASE_URL = os.getenv("DATABASE_URL") or ""
 # What each tier may ask. The anonymous allowance is a demo, not a free plan:
 # enough to see that the assistant answers from real data and not from the air,
 # which is the thing worth making an account for.
-ANON_ASKS = int(os.getenv("KOUNSLY_ANON_ASKS", "3"))            # per device, lifetime
+ANON_ASKS = int(os.getenv("KOUNSLY_ANON_ASKS", "2"))            # per device, lifetime
 FREE_ASKS_PER_MONTH = int(os.getenv("KOUNSLY_FREE_ASKS", "15"))
 PRO_ASKS_PER_MONTH = int(os.getenv("KOUNSLY_PRO_ASKS", "600"))  # a ceiling on abuse, not a plan limit
+
+# How many programmes an anonymous reader may open in full. Counted in the
+# browser, not here, and deliberately so: /api/program stays public because the
+# cards link to it and a search engine should be able to read it. This is a shop
+# window, not a lock — the point is to ask for an account at the moment the
+# catalogue has already proved it is worth one.
+ANON_VIEWS = int(os.getenv("KOUNSLY_ANON_VIEWS", "2"))
 
 # The four the onboarding asks, plus what the account page adds. Order matters
 # only for the export file, which is read by people.
@@ -515,6 +525,64 @@ def record_ask(user: Optional[dict[str, Any]], anon_id: str, uid: str) -> None:
         print(f"ask not recorded: {str(e)[:160]}")
 
 
+_settings: dict[str, Any] = {}
+_settings_at = 0.0
+_settings_lock = threading.Lock()
+
+
+def auth_settings() -> dict[str, Any]:
+    """What Supabase itself says is switched on, cached for five minutes.
+
+    Read rather than assumed, because the two lists came apart in exactly the
+    way that is hardest to see from the outside: KOUNSLY_PROVIDERS said
+    "google,apple,email", the project had only e-mail enabled, and pressing
+    "Continue with Google" navigated to a Supabase URL that answered a raw
+    400 — `provider is not enabled` — which in a browser reads as the sign-in
+    doing nothing at all. A button for a provider that cannot work is worse than
+    no button, and this endpoint is the only honest source for which can.
+
+    Unreachable means we fall back to the env var: a button that might fail is
+    still better than a page with no way in.
+    """
+    global _settings, _settings_at
+    if not SUPABASE_URL:
+        return {}
+    now = time.monotonic()
+    # The timestamp is the freshness marker, not the contents: an empty answer
+    # has to be cached as firmly as a full one, or a failure is retried on every
+    # request and the retry is what costs the four seconds.
+    if _settings_at and now - _settings_at < 300:
+        return _settings
+    with _settings_lock:
+        if _settings_at and time.monotonic() - _settings_at < 300:
+            return _settings
+        try:
+            req = urllib.request.Request(
+                f"{SUPABASE_URL}/auth/v1/settings",
+                headers={"apikey": os.getenv("SUPABASE_ANON_KEY") or ""},
+            )
+            with urllib.request.urlopen(req, timeout=4) as response:
+                _settings = json.loads(response.read().decode()) or {}
+        except Exception as e:  # noqa: BLE001 — a slow auth host must not hold up the page
+            print(f"auth settings unreadable: {str(e)[:160]}")
+        finally:
+            # Stamped whether or not it worked, so a failure is cached too.
+            # Without this, an auth host that is down turns every /api/config —
+            # which is on the page's boot path — into a four-second wait, and
+            # slow is how an outage on their side becomes an outage on ours.
+            _settings_at = now
+    return _settings
+
+
+def providers() -> list[str]:
+    """The sign-in buttons to draw: what we want, intersected with what works."""
+    wanted = [p.strip() for p in os.getenv("KOUNSLY_PROVIDERS", "google,apple,email").split(",") if p.strip()]
+    external = auth_settings().get("external") or {}
+    if not external:
+        return wanted
+    return [p for p in wanted if external.get(p)]
+
+
 def public_config() -> dict[str, Any]:
     """What the browser needs to start a sign-in. The anon key is publishable by
     design — it is the key Supabase's own client library ships to the page."""
@@ -522,9 +590,15 @@ def public_config() -> dict[str, Any]:
         "enabled": accounts_available(),
         "url": SUPABASE_URL,
         "anon_key": os.getenv("SUPABASE_ANON_KEY") or "",
-        "providers": [p.strip() for p in os.getenv("KOUNSLY_PROVIDERS", "google,apple,email").split(",") if p.strip()],
+        "providers": providers(),
         "anon_asks": ANON_ASKS,
+        "anon_views": ANON_VIEWS,
         "free_asks": FREE_ASKS_PER_MONTH,
+        # Whether a new account has to open a link in an e-mail before it can be
+        # used. When it does, the sign-up box has to say so before it takes a
+        # password — otherwise the account is created, the sign-in that follows
+        # answers "email not confirmed", and nothing on screen explains why.
+        "email_confirm": not bool(auth_settings().get("mailer_autoconfirm")),
         # Off until custom SMTP is configured, and for a specific reason:
         # Supabase refuses to edit e-mail templates on its built-in mailer, and
         # the stock Magic Link template sends a *link*, not the six-digit token

@@ -3,7 +3,49 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kounsly — find your degree abroad</title>
+
+<!-- The head used to be these two lines and a title. Everything below it is
+     what the page looks like somewhere other than a browser window: a Google
+     result, a link pasted into Telegram, a tab strip. A product people find by
+     being sent a link had no preview at all — a bare URL and nothing else. -->
+
+<!-- Ukrainian, like <html lang>: it is what the page serves before any script
+     runs, and what a crawler reads. The switch to English happens client-side,
+     after both of these have already been indexed. -->
+<title>Kounsly — навчання за кордоном англійською</title>
+<meta name="description" content="Пошук магістратур, бакалаврату й PhD англійською мовою у 14 країнах — вартість, дедлайни та вимоги з офіційних джерел. Опиши, чого хочеш, звичайною мовою. Без агента й комісій.">
+
+<link rel="canonical" href="https://kounsly.com/">
+<link rel="alternate" hreflang="uk" href="https://kounsly.com/">
+<link rel="alternate" hreflang="en" href="https://kounsly.com/">
+<link rel="alternate" hreflang="x-default" href="https://kounsly.com/">
+
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+
+<!-- Both, in this order: the browser paints the address bar and the tab strip
+     from whichever matches the reader's theme. -->
+<meta name="theme-color" content="#F7F7FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0B11" media="(prefers-color-scheme: dark)">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kounsly">
+<meta property="og:url" content="https://kounsly.com/">
+<meta property="og:title" content="Kounsly — навчання за кордоном англійською">
+<meta property="og:description" content="Магістратури, бакалаврат і PhD англійською у 14 країнах — вартість, дедлайни та вимоги з офіційних джерел. Без агента й комісій.">
+<!-- Absolute, and a raster file: a relative path is resolved against the
+     scraper, not the site, and none of the big ones render SVG. -->
+<meta property="og:image" content="https://kounsly.com/static/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Kounsly — знайди навчання за кордоном">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:locale:alternate" content="en_GB">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Kounsly — навчання за кордоном англійською">
+<meta name="twitter:description" content="Магістратури, бакалаврат і PhD англійською у 14 країнах — вартість, дедлайни та вимоги з офіційних джерел. Без агента й комісій.">
+<meta name="twitter:image" content="https://kounsly.com/static/og.png">
 </head>
 <body>
 <style>
@@ -254,14 +296,23 @@
 
 <div class="wrap">
   <div class="cols">
+    <!-- The speciality filter is the one a stranger gets: it is the question
+         everyone arrives with, and answering it is what makes the catalogue
+         worth an account. Everything marked data-gated is drawn, disabled, and
+         opens the wall when touched — a locked control that is visible says
+         what signing in buys; a hidden one says nothing at all.
+         The order is deliberate: what works, then why the rest doesn't. -->
     <aside class="filters">
-      <div class="fgroup"><h4 data-i18n="f_region"></h4><select id="f-region"></select></div>
-      <div class="fgroup"><h4 data-i18n="f_country"></h4><select id="f-country"></select></div>
       <div class="fgroup"><h4 data-i18n="f_field"></h4><select id="f-field"></select></div>
-      <div class="fgroup"><h4 data-i18n="f_level"></h4><select id="f-level"></select></div>
-      <div class="fgroup"><h4 data-i18n="f_budget"></h4><select id="f-budget"></select></div>
-      <div class="fgroup">
+      <div class="flock" id="flock" hidden></div>
+      <div class="fgroup" data-gated><h4 data-i18n="f_region"></h4><select id="f-region"></select></div>
+      <div class="fgroup" data-gated><h4 data-i18n="f_country"></h4><select id="f-country"></select></div>
+      <div class="fgroup" data-gated><h4 data-i18n="f_level"></h4><select id="f-level"></select></div>
+      <div class="fgroup" data-gated><h4 data-i18n="f_budget"></h4><select id="f-budget"></select></div>
+      <div class="fgroup" data-gated>
         <label class="toggle"><input type="checkbox" id="f-free"><span class="track"></span><span data-i18n="freeonly"></span></label>
+      </div>
+      <div class="fgroup">
         <button class="reset" id="reset" data-i18n="reset"></button>
       </div>
     </aside>

@@ -43,7 +43,15 @@
       g_profile_t: "Щоб показати саме твій дедлайн",
       g_profile_b: "Дати різні для громадян ЄС і для всіх інших. Скажи, хто ти — і побачиш свою.",
       g_signup_t: "Створи акаунт", g_signup_b: "Збережені програми з нотатками, твої дедлайни й більше питань до асистента.",
-      signup: "Зареєструватися",
+      g_view_t: "Дві програми ти вже подивилась",
+      g_view_b: "Зареєструйся — і відкривай усі 96 000 програм із деталями, дедлайнами й асистентом.",
+      g_filter_t: "Ці фільтри — з акаунтом",
+      g_filter_b: "Країна, рівень, бюджет і «лише безкоштовні». Пошук за спеціальністю працює й без реєстрації.",
+      // Two labels for one button. "Зареєструватися" is fifteen characters and
+      // 152 pixels wide; next to "Увійти", the language and theme buttons it
+      // pushed the header 72px past the edge of a 390px phone, so the main
+      // call to action on the site was the part hanging off the screen.
+      signup: "Зареєструватися", signup_short: "Створити",
       g_default_t: "Увійди в Kounsly",
       g_default_b: "Збережені програми, нагадування про дедлайни й більше питань до асистента.",
       with_google: "Продовжити з Google", with_apple: "Продовжити з Apple",
@@ -51,16 +59,23 @@
       email_ph: "твоя@пошта.com", email_send: "Надіслати код",
       code_t: "Код надіслано на {email}", code_ph: "6 цифр", code_send: "Підтвердити",
       code_again: "Надіслати ще раз", back: "← Інший спосіб",
-      pw_ph: "Пароль", pw_in: "Увійти", pw_up: "Створити акаунт",
+      pw_ph: "Пароль", pw_ph_up: "Пароль — від 8 символів", pw_in: "Увійти", pw_up: "Створити акаунт",
       to_up: "Немає акаунта? Створити", to_in: "Вже є акаунт? Увійти",
       pw_forgot: "Забув пароль?", pw_code: "Увійти кодом з пошти",
       pw_confirm_t: "Підтвердь пошту",
       pw_confirm_b: "Надіслали лист на {email}. Відкрий його — і акаунт буде готовий.",
+      pw_unconf_t: "Пошта ще не підтверджена",
+      pw_unconf_b: "Акаунт для {email} уже є, але лист із підтвердженням ще не відкритий. Перевір пошту — і спам теж. Або надішлемо ще раз.",
+      pw_signup_note: "Надішлемо лист — відкрий у ньому посилання, і акаунт буде готовий.",
+      pw_confirm_again: "Не прийшов? Надіслати ще раз",
+      pw_confirm_resent: "Надіслали ще раз. Перевір і теку «Спам».",
+      pw_confirm_wait: "Ще раз — за {n} с",
       pw_reset_sent: "Якщо на {email} є акаунт, лист для зміни пароля вже в дорозі.",
       pw_new_t: "Новий пароль", pw_new_b: "Придумай новий пароль — і одразу ним увійдеш.",
       pw_new_ph: "Новий пароль", pw_new_save: "Зберегти",
       pw_changed: "Пароль змінено.",
-      legal: "Входячи, ти погоджуєшся з {terms}.", legal_terms: "умовами",
+      legal: "Входячи, ти погоджуєшся з {terms} і {privacy}.",
+      legal_terms: "умовами", legal_privacy: "політикою приватності",
       err_email: "Схоже, це не пошта.", err_code: "Код не підійшов. Спробуй ще раз.",
       err_pw_short: "Пароль має бути щонайменше 8 символів.",
       err_pw_wrong: "Пошта або пароль не підходять.",
@@ -90,7 +105,11 @@
       g_profile_t: "To show the deadline that is actually yours",
       g_profile_b: "Dates differ for EU citizens and everyone else. Tell us who you are and you'll see yours.",
       g_signup_t: "Create an account", g_signup_b: "Saved programmes with notes, your deadlines, and more questions for the assistant.",
-      signup: "Sign up",
+      g_view_t: "You've seen two programmes",
+      g_view_b: "Create an account and open all 96,000 in full — deadlines, requirements and the assistant included.",
+      g_filter_t: "These filters come with an account",
+      g_filter_b: "Country, level, budget and free-only. Searching by subject works without one.",
+      signup: "Sign up", signup_short: "Sign up",
       g_default_t: "Sign in to Kounsly",
       g_default_b: "Saved programmes, deadline reminders, and more questions for the assistant.",
       with_google: "Continue with Google", with_apple: "Continue with Apple",
@@ -98,16 +117,23 @@
       email_ph: "you@email.com", email_send: "Send code",
       code_t: "Code sent to {email}", code_ph: "6 digits", code_send: "Confirm",
       code_again: "Send again", back: "← Another way",
-      pw_ph: "Password", pw_in: "Sign in", pw_up: "Create account",
+      pw_ph: "Password", pw_ph_up: "Password — 8 characters or more", pw_in: "Sign in", pw_up: "Create account",
       to_up: "No account? Create one", to_in: "Already have one? Sign in",
       pw_forgot: "Forgot your password?", pw_code: "E-mail me a code instead",
       pw_confirm_t: "Confirm your e-mail",
       pw_confirm_b: "We sent a message to {email}. Open it and the account is ready.",
+      pw_unconf_t: "That address isn't confirmed yet",
+      pw_unconf_b: "There is an account for {email}, but the confirmation e-mail hasn't been opened. Check your inbox — and your spam. Or we'll send it again.",
+      pw_signup_note: "We'll e-mail you a link. Open it and the account is ready.",
+      pw_confirm_again: "Didn't arrive? Send it again",
+      pw_confirm_resent: "Sent again. Check your spam folder too.",
+      pw_confirm_wait: "Again in {n}s",
       pw_reset_sent: "If {email} has an account, a reset e-mail is on its way.",
       pw_new_t: "New password", pw_new_b: "Pick a new one and you're signed in with it.",
       pw_new_ph: "New password", pw_new_save: "Save",
       pw_changed: "Password changed.",
-      legal: "By signing in you accept the {terms}.", legal_terms: "terms",
+      legal: "By signing in you accept the {terms} and the {privacy}.",
+      legal_terms: "terms", legal_privacy: "privacy policy",
       err_email: "That doesn't look like an e-mail.", err_code: "That code didn't work. Try again.",
       err_pw_short: "A password needs at least 8 characters.",
       err_pw_wrong: "That e-mail and password don't match.",
@@ -342,7 +368,12 @@
   }
 
   function signUpPassword(email, password) {
-    return sbPost("/signup", { email: email, password: password })
+    // Say where the link in the e-mail should land. Without it Supabase falls
+    // back to the project's Site URL, which is whatever it was set to on the
+    // day the project was made — a confirmation that opens localhost:3000 is a
+    // sign-up nobody can finish, and nothing on this side would show it.
+    return sbPost("/signup?redirect_to=" + encodeURIComponent(location.origin + location.pathname),
+                  { email: email, password: password })
       .then(function (r) {
         if (!r.ok) return { ok: false, code: errCode(r.data) };
         // With e-mail confirmation on — the default, and worth keeping — the
@@ -351,6 +382,17 @@
         if (r.data.access_token) { setSession(r.data); return { ok: true, signedIn: true }; }
         return { ok: true, signedIn: false };
       });
+  }
+
+  /** Send the confirmation e-mail again. The first one goes to spam often
+   *  enough that without this the sign-up ends here: the account exists, so
+   *  registering again with the same address is refused, and there is no way
+   *  back to the message that would finish it. */
+  function resendConfirm(email) {
+    return sbPost("/resend?redirect_to=" + encodeURIComponent(location.origin + location.pathname),
+                  { type: "signup", email: email })
+      .then(function (r) { return r.ok; })
+      .catch(function () { return false; });
   }
 
   /** Always reported as sent, whatever the answer. Telling a stranger whether
@@ -437,6 +479,10 @@
     ask: ["g_ask_t", "g_ask_b"],
     profile: ["g_profile_t", "g_profile_b"],
     signup: ["g_signup_t", "g_signup_b"],
+    // Limits reached rather than features reached for: the third programme
+    // opened without an account, and the filters that need one.
+    view: ["g_view_t", "g_view_b"],
+    filter: ["g_filter_t", "g_filter_b"],
     "default": ["g_default_t", "g_default_b"]
   };
 
@@ -454,7 +500,14 @@
   function closeGate() {
     var g = document.getElementById("gate");
     if (g) g.classList.remove("open");
-    document.body.style.overflow = "";
+    // Not unconditionally "": the wall usually opens from inside an open detail
+    // sheet, and that sheet locked the page behind it for the same reason.
+    // Clearing the lock on the way out of the wall handed the scroll back to
+    // the page underneath, so a drag over a still-open sheet moved the search
+    // results behind it instead.
+    var sheet = document.getElementById("sheet-wrap");
+    document.body.style.overflow =
+      sheet && sheet.classList.contains("open") ? "hidden" : "";
     afterSignIn = null;
   }
 
@@ -489,19 +542,32 @@
         // sentence nobody can click is a claim with nothing behind it. The page
         // it points at is where that promise is actually made, and where a
         // payment provider will look for it.
+        // Both pages, not just the terms: the privacy policy is the half of the
+        // promise about what happens to the address they are about to type, and
+        // it lives at its own URL — naming it without linking it is the same
+        // uncheckable claim the terms link exists to avoid.
         '<p class="gate-legal">' +
-          esc(T("legal")).replace("{terms}",
-            '<a href="/terms" target="_blank" rel="noopener">' + esc(T("legal_terms")) + "</a>") +
+          esc(T("legal"))
+            .replace("{terms}",
+              '<a href="/terms" target="_blank" rel="noopener">' + esc(T("legal_terms")) + "</a>")
+            .replace("{privacy}",
+              '<a href="/privacy" target="_blank" rel="noopener">' + esc(T("legal_privacy")) + "</a>") +
         "</p>" +
       "</div>";
 
     g.classList.add("open");
     document.body.style.overflow = "hidden";
     g.querySelector(".gate-close").onclick = closeGate;
+    // Which form the e-mail route opens on follows the button that opened the
+    // wall. Someone who pressed "Sign up" and lands on a box saying "Sign in"
+    // has to read the small print under it to find out they are in the wrong
+    // one; the other reasons are all interruptions of someone already using
+    // the site, and those are far more often people who have been here before.
+    var emailMode = reason === "signup" ? "up" : "in";
     g.querySelectorAll(".gate-btn").forEach(function (b) {
       b.onclick = function () {
         var p = b.getAttribute("data-provider");
-        if (p === "email") emailStep();
+        if (p === "email") emailStep(emailMode);
         else oauth(p);
       };
     });
@@ -543,10 +609,18 @@
       '<form class="gate-form stack" id="gate-email" novalidate>' +
         '<input type="email" id="gate-email-in" autocomplete="email" inputmode="email" ' +
           'placeholder="' + esc(T("email_ph")) + '" value="' + esc(email || "") + '" required>' +
-        '<input type="password" id="gate-pw-in" placeholder="' + esc(T("pw_ph")) + '" ' +
+        // The rule is in the placeholder when a password is being chosen, so it
+        // is read before it is broken. Told only after the submit, it reads as
+        // a rejection of something they already decided on.
+        '<input type="password" id="gate-pw-in" placeholder="' +
+          esc(T(mode === "up" ? "pw_ph_up" : "pw_ph")) + '" ' +
           'autocomplete="' + (mode === "up" ? "new-password" : "current-password") + '" required>' +
         '<button type="submit">' + esc(T(submit)) + "</button>" +
       "</form>" +
+      // Said before the button, not after it. Signing up does not sign you in
+      // here — a confirmation link does — and someone who was not told that
+      // reads the step that follows as the form having failed.
+      (mode === "up" ? '<p class="gate-note">' + esc(T("pw_signup_note")) + "</p>" : "") +
       '<div class="gate-err" id="gate-err"></div>' +
       '<div class="gate-links">' +
         '<button type="button" data-act="mode">' + esc(T(mode === "up" ? "to_in" : "to_up")) + "</button>" +
@@ -588,7 +662,15 @@
       var run = mode === "up" ? signUpPassword(address, password) : signInPassword(address, password);
       run
         .then(function (r) {
-          if (!r.ok) { fail(T(PW_ERRORS[r.code] || "err_generic")); return; }
+          if (!r.ok) {
+            // "Not confirmed" is the one failure with something to do about it,
+            // and a sentence in red is not it: the account is already made, so
+            // signing up again will not work either. Send them to the step that
+            // can put another message in their inbox.
+            if (r.code === "email_not_confirmed") { unconfirmedStep(address); return; }
+            fail(T(PW_ERRORS[r.code] || "err_generic"));
+            return;
+          }
           if (mode === "up" && !r.signedIn) { confirmSentStep(address); return; }
           arrived();
         })
@@ -601,16 +683,74 @@
     };
   }
 
-  /** Signed up, e-mail not confirmed yet. There is nothing to do here but
-   *  say so — the link in the message finishes it, and lands back on the site
-   *  signed in. */
-  function confirmSentStep(email) {
+  /** Waiting on the confirmation e-mail — reached two ways, and both used to
+   *  be dead ends. Straight after signing up, and again weeks later when the
+   *  message was never opened and the sign-in comes back "not confirmed": the
+   *  account exists, so signing up again is refused, and the only thing that
+   *  finishes it is a link in a message that may be in spam or may never have
+   *  arrived. The way out of both is the same button.
+   *
+   *  `title`/`body` differ because the two arrivals are not the same news. */
+  function confirmWaitStep(email, title, body) {
     var step = stepAlone();
     step.innerHTML =
-      "<h3 class=\"gate-sub\">" + esc(T("pw_confirm_t")) + "</h3>" +
-      '<p class="gate-sent">' + esc(T("pw_confirm_b").replace("{email}", email)) + "</p>" +
+      "<h3 class=\"gate-sub\">" + esc(T(title)) + "</h3>" +
+      '<p class="gate-sent">' + esc(T(body).replace("{email}", email)) + "</p>" +
+      '<div class="gate-links">' +
+        '<button type="button" data-act="again">' + esc(T("pw_confirm_again")) + "</button>" +
+      "</div>" +
+      '<div class="gate-err" id="gate-err"></div>' +
       '<button class="gate-back" type="button">' + esc(T("back")) + "</button>";
     step.querySelector(".gate-back").onclick = backToChoices;
+
+    // Supabase rate-limits this endpoint, and a button that can be pressed
+    // faster than the server will answer only earns a 429 and an error where a
+    // sent e-mail should be. The countdown is the honest version of the wait.
+    var again = step.querySelector('[data-act="again"]');
+    var timer = null;
+    function cooldown(seconds) {
+      if (timer) clearInterval(timer);
+      again.disabled = true;
+      var left = seconds;
+      var tick = function () {
+        // The step can be replaced while the countdown runs — leave no interval
+        // ticking against a button that is no longer in the document.
+        if (!document.body.contains(again)) { clearInterval(timer); timer = null; return; }
+        if (left <= 0) {
+          clearInterval(timer); timer = null;
+          again.disabled = false;
+          again.textContent = T("pw_confirm_again");
+          return;
+        }
+        again.textContent = T("pw_confirm_wait").replace("{n}", left);
+        left -= 1;
+      };
+      tick();
+      timer = setInterval(tick, 1000);
+    }
+
+    again.onclick = function () {
+      again.disabled = true;
+      again.textContent = T("sending");
+      fail("");
+      resendConfirm(email).then(function (ok) {
+        // The step may have been left while the request was in flight.
+        if (!document.body.contains(again)) return;
+        if (ok) note(T("pw_confirm_resent"));
+        else fail(T("err_generic"));
+        cooldown(60);
+      });
+    };
+  }
+
+  /** Just signed up: the message is on its way. */
+  function confirmSentStep(email) {
+    confirmWaitStep(email, "pw_confirm_t", "pw_confirm_b");
+  }
+
+  /** Came back to sign in, and the address was never confirmed. */
+  function unconfirmedStep(email) {
+    confirmWaitStep(email, "pw_unconf_t", "pw_unconf_b");
   }
 
   function resetStep(email) {
@@ -635,7 +775,17 @@
       var btn = e.target.querySelector("button");
       btn.disabled = true;
       btn.textContent = T("sending");
-      sendReset(address).then(function () { sentStep(T("pw_reset_sent").replace("{email}", address)); });
+      // sendReset swallows its own failures on purpose — the answer is the same
+      // either way — but a throw before the promise exists left this button
+      // stuck on "Sending…" with no way forward and no error to explain it.
+      sendReset(address)
+        .then(function () { sentStep(T("pw_reset_sent").replace("{email}", address)); })
+        .catch(function () {
+          if (!document.getElementById("gate-reset")) return;
+          fail(T("err_generic"));
+          btn.disabled = false;
+          btn.textContent = T("email_send");
+        });
     };
   }
 
@@ -750,7 +900,17 @@
 
   function fail(message) {
     var box = document.getElementById("gate-err");
-    if (box) box.textContent = message;
+    if (!box) return;
+    box.textContent = message;
+    box.classList.remove("ok");
+  }
+
+  /** The same line, for news that isn't bad. */
+  function note(message) {
+    var box = document.getElementById("gate-err");
+    if (!box) return;
+    box.textContent = message;
+    box.classList.add("ok");
   }
 
   /** Signed in, by whichever route. Move the shortlist over, then finish the
@@ -930,9 +1090,14 @@
       // Two buttons, not one. "Sign in" is for the person who has been here
       // before; everyone else needs to be told they can start. One button
       // saying "Sign in" reads as "members only" to someone who is neither.
+      // Both labels ship; CSS picks one by viewport width. Choosing in JS would
+      // mean the wrong one after a rotation, and a resize listener for a word.
       slot.innerHTML =
         '<button class="signin" id="signinbtn">' + esc(T("signin")) + "</button>" +
-        '<button class="signup" id="signupbtn">' + esc(T("signup")) + "</button>";
+        '<button class="signup" id="signupbtn">' +
+          '<span class="lbl-wide">' + esc(T("signup")) + "</span>" +
+          '<span class="lbl-narrow">' + esc(T("signup_short")) + "</span>" +
+        "</button>";
       document.getElementById("signinbtn").onclick = function () { openGate("default", null); };
       document.getElementById("signupbtn").onclick = function () { openGate("signup", null); };
       return;
@@ -1050,6 +1215,9 @@
     user: function () { return me && me.user; },
     signedIn: function () { return !!me; },
     reminders: function () { return !!cfg.reminders; },
+    // How many programmes open in full before the wall. Two is the fallback for
+    // a config that predates the setting, not a second place to change it.
+    anonViews: function () { return cfg.anon_views == null ? 2 : cfg.anon_views; },
     quota: function () { return (me && me.quota) || anonQuota; },
     setQuota: function (q) { if (me) me.quota = q; else anonQuota = q; emit(); },
     quotaLabel: function () {
