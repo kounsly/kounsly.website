@@ -82,6 +82,7 @@
       err_pw_taken: "Такий акаунт уже є. Спробуй увійти.",
       err_pw_unconfirmed: "Пошта ще не підтверджена — перевір лист від нас.",
       err_generic: "Не вдалося. Спробуй ще раз за хвилину.",
+      err_email_rate: "Забагато листів за останню годину — цей лист не пішов. Спробуй десь за годину.",
       sending: "Надсилаю…", checking: "Перевіряю…",
       ob_t: "Чотири питання — і сторінки почнуть говорити про тебе",
       ob_b: "Це вирішує, який із дедлайнів твій і чи вистачає твоїх балів. Можна пропустити.",
@@ -140,6 +141,7 @@
       err_pw_taken: "There's already an account for this address. Try signing in.",
       err_pw_unconfirmed: "That address isn't confirmed yet — check for our e-mail.",
       err_generic: "Didn't work. Try again in a minute.",
+      err_email_rate: "Too many e-mails in the last hour — this one did not go out. Try again in about an hour.",
       sending: "Sending…", checking: "Checking…",
       ob_t: "Four questions, and the pages start talking about you",
       ob_b: "It decides which deadline is yours and whether your scores are enough. Skippable.",
@@ -326,13 +328,16 @@
    *  `error_description` on older ones. Normalise to the few cases the sign-in
    *  box actually says something different about; everything else is generic. */
   function errCode(data) {
+    // `code` on its own can be the HTTP status as a number — 429 here — which
+    // is not a code any of these tables know. Only a string is an error code.
     var code = data.error_code || data.code || "";
-    if (code) return code;
+    if (typeof code === "string" && code) return code;
     var text = String(data.msg || data.error_description || data.error || "").toLowerCase();
     if (text.indexOf("invalid login") >= 0 || text.indexOf("invalid grant") >= 0) return "invalid_credentials";
     if (text.indexOf("not confirmed") >= 0) return "email_not_confirmed";
     if (text.indexOf("already registered") >= 0 || text.indexOf("already been registered") >= 0) return "user_already_exists";
     if (text.indexOf("password") >= 0 && text.indexOf("least") >= 0) return "weak_password";
+    if (text.indexOf("rate limit") >= 0 || text.indexOf("too many requests") >= 0) return "over_email_send_rate_limit";
     return "";
   }
 
@@ -341,7 +346,13 @@
     email_not_confirmed: "err_pw_unconfirmed",
     user_already_exists: "err_pw_taken",
     email_exists: "err_pw_taken",
-    weak_password: "err_pw_short"
+    weak_password: "err_pw_short",
+    // Not the reader's fault and not fixable by them: the project's mail
+    // allowance for the hour is spent, so no message is going out however many
+    // times the button is pressed. Saying "try again in a minute" here sends
+    // someone back to a button that cannot work yet, and reads as the address
+    // or the password being the problem when neither is.
+    over_email_send_rate_limit: "err_email_rate"
   };
 
   function sendCode(email) {
@@ -391,8 +402,11 @@
   function resendConfirm(email) {
     return sbPost("/resend?redirect_to=" + encodeURIComponent(location.origin + location.pathname),
                   { type: "signup", email: email })
-      .then(function (r) { return r.ok; })
-      .catch(function () { return false; });
+      // The code, not just ok/failed. The interesting failure here is the mail
+      // allowance being spent, and that needs saying rather than hiding behind
+      // "didn't work" — see err_email_rate.
+      .then(function (r) { return { ok: r.ok, code: r.ok ? "" : errCode(r.data) }; })
+      .catch(function () { return { ok: false, code: "" }; });
   }
 
   /** Always reported as sent, whatever the answer. Telling a stranger whether
@@ -733,12 +747,15 @@
       again.disabled = true;
       again.textContent = T("sending");
       fail("");
-      resendConfirm(email).then(function (ok) {
+      resendConfirm(email).then(function (r) {
         // The step may have been left while the request was in flight.
         if (!document.body.contains(again)) return;
-        if (ok) note(T("pw_confirm_resent"));
-        else fail(T("err_generic"));
-        cooldown(60);
+        if (r.ok) { note(T("pw_confirm_resent")); cooldown(60); return; }
+        fail(T(PW_ERRORS[r.code] || "err_generic"));
+        // An hour, not a minute: the allowance that ran out is hourly, and a
+        // button offering to try again in sixty seconds is offering a retry
+        // that is certain to fail the same way.
+        cooldown(r.code === "over_email_send_rate_limit" ? 300 : 60);
       });
     };
   }
