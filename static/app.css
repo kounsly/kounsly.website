@@ -331,6 +331,23 @@
 .gate-err.ok{color:var(--muted)}
 /* What happens after the button is pressed, said before it is. */
 .gate-note{margin:9px 0 0;font-size:.82rem;line-height:1.45;color:var(--muted)}
+
+/* A round trip that came back with a failure instead of a token. Loud enough to
+   read before the buttons underneath it, and carrying the provider's own words:
+   "redirect_uri_mismatch" in front of the person configuring it is worth an
+   hour of guessing at why the click did nothing. */
+.gate-alert{
+  margin:14px 0 4px;padding:11px 13px;border-radius:11px;
+  border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);
+  background:color-mix(in srgb,var(--warn) 9%,transparent);
+}
+.gate-alert p{margin:0;font-size:.86rem;line-height:1.45;color:var(--text)}
+.gate-alert-detail{margin-top:6px !important;color:var(--muted) !important;font-size:.78rem !important}
+.gate-alert code{
+  font-family:var(--mono);font-size:.76rem;
+  /* The provider writes this, and some of them write one long unbroken token. */
+  word-break:break-word;
+}
 .gate-back{
   margin-top:6px;border:0;background:none;color:var(--muted);
   font:inherit;font-size:.83rem;text-decoration:underline;cursor:pointer;padding:0;

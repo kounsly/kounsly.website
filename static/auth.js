@@ -83,6 +83,9 @@
       err_pw_unconfirmed: "Пошта ще не підтверджена — перевір лист від нас.",
       err_generic: "Не вдалося. Спробуй ще раз за хвилину.",
       err_email_rate: "Забагато листів за останню годину — цей лист не пішов. Спробуй десь за годину.",
+      err_link_expired: "Посилання з листа вже недійсне. Запроси новий лист або увійди поштою.",
+      err_oauth: "Вхід не завершився — провайдер повернув помилку. Спробуй ще раз або увійди поштою.",
+      err_detail: "Відповідь провайдера:",
       sending: "Надсилаю…", checking: "Перевіряю…",
       ob_t: "Чотири питання — і сторінки почнуть говорити про тебе",
       ob_b: "Це вирішує, який із дедлайнів твій і чи вистачає твоїх балів. Можна пропустити.",
@@ -142,6 +145,9 @@
       err_pw_unconfirmed: "That address isn't confirmed yet — check for our e-mail.",
       err_generic: "Didn't work. Try again in a minute.",
       err_email_rate: "Too many e-mails in the last hour — this one did not go out. Try again in about an hour.",
+      err_link_expired: "That link from the e-mail is no longer valid. Ask for a new one, or sign in with e-mail.",
+      err_oauth: "The sign-in did not finish — the provider returned an error. Try again, or use e-mail.",
+      err_detail: "The provider said:",
       sending: "Sending…", checking: "Checking…",
       ob_t: "Four questions, and the pages start talking about you",
       ob_b: "It decides which deadline is yours and whether your scores are enough. Skippable.",
@@ -453,19 +459,85 @@
    *  Returns the kind of arrival, because a recovery link means the same thing
    *  as a sign-in plus one more step: they came here to change the password. */
   var arrivalType = null;
+  var arrivalError = null;   // { key, detail } — what to say, and what was said
+
+  // The names an arrival can carry a failure under, in either half of the URL.
+  var ERROR_PARAMS = ["error", "error_code", "error_description"];
+
+  /** Everything that has to come off the address bar afterwards: the token
+   *  params for the reasons above, and the error params so that a reload does
+   *  not re-report a failure that has already been shown and dealt with. */
+  var ARRIVAL_PARAMS = ERROR_PARAMS.concat([
+    "access_token", "refresh_token", "expires_in", "expires_at",
+    "token_type", "type", "provider_token", "provider_refresh_token", "code"
+  ]);
+
+  /** Strip the arrival out of the URL and leave everything else alone.
+   *
+   *  The old version rebuilt the address as pathname + search, which cleared
+   *  the fragment and kept the query untouched. That was right while an arrival
+   *  could only ever be in the fragment; a failure in the query string would
+   *  have stayed in the address bar for the rest of the session and been
+   *  re-reported on every reload.
+   */
+  function clearArrival() {
+    var q = new URLSearchParams(location.search);
+    ARRIVAL_PARAMS.forEach(function (k) { q.delete(k); });
+    var rest = q.toString();
+    history.replaceState(null, "", location.pathname + (rest ? "?" + rest : ""));
+  }
+
+  /** Read a failure out of a set of params, if there is one there. */
+  function readError(params) {
+    var present = ERROR_PARAMS.some(function (k) { return params.get(k); });
+    if (!present) return null;
+    var code = params.get("error_code") || params.get("error") || "";
+    // The description is written by the provider and arrives through the
+    // address bar, so it is shown escaped and short — long enough for
+    // "redirect_uri_mismatch" to be readable, not long enough to be a payload.
+    var detail = params.get("error_description") || params.get("error") || code;
+    return {
+      key: code === "otp_expired" ? "err_link_expired" : "err_oauth",
+      detail: String(detail).replace(/\+/g, " ").slice(0, 200)
+    };
+  }
 
   function captureRedirect() {
-    if (!location.hash) return false;
     var h = new URLSearchParams(location.hash.slice(1));
+    var q = new URLSearchParams(location.search);
 
-    // An expired or already-used link comes back as an error rather than a
-    // token. Silently doing nothing looks like the link was ignored.
-    if (h.get("error")) {
+    // Both halves of the URL, because a failure picks its own. Supabase puts
+    // the e-mail-link errors in the fragment, but a provider that has been
+    // configured wrong answers the redirect with ?error=...&error_description=,
+    // and this only ever looked at the fragment — so the page loaded signed out
+    // and saying nothing, which is indistinguishable from the click being
+    // ignored. That costume has been worn by three separate faults already.
+    var failure = readError(h) || readError(q);
+    if (failure) {
       arrivalType = "error";
-      history.replaceState(null, "", location.pathname + location.search);
+      arrivalError = failure;
+      clearArrival();
       return false;
     }
-    if (!h.get("access_token")) return false;
+
+    if (!h.get("access_token")) {
+      // `?code=` with nothing in the fragment is the PKCE shape. We send no
+      // code_challenge, so /authorize should never answer this way and we hold
+      // no verifier to exchange it with — but an unrecognised arrival that is
+      // dropped in silence is the failure mode this whole function exists to
+      // avoid, so it reports rather than returns.
+      if (q.get("code")) {
+        arrivalType = "error";
+        arrivalError = { key: "err_oauth", detail: "pkce_code_without_verifier" };
+        console.error(
+          "Kounsly: OAuth returned a PKCE code (?code=) with no token in the " +
+          "fragment. This client expects the implicit flow and cannot exchange " +
+          "it — check that the provider is not configured for PKCE."
+        );
+        clearArrival();
+      }
+      return false;
+    }
 
     arrivalType = h.get("type") || "signin";
     setSession({
@@ -473,7 +545,7 @@
       refresh_token: h.get("refresh_token"),
       expires_in: h.get("expires_in")
     });
-    history.replaceState(null, "", location.pathname + location.search);
+    clearArrival();
     return true;
   }
 
@@ -545,11 +617,29 @@
       buttons += '<button class="gate-btn g-email" data-provider="email">' +
         '<span class="gi">✉</span>' + esc(T("with_email")) + "</button>";
 
+    // A failed arrival, if this gate is being opened because of one. Shown
+    // once: the reader has now been told, and a reload should not accuse the
+    // provider a second time for the same trip. The detail is escaped and comes
+    // from the address bar, so it is displayed as text and never as markup.
+    var alert = "";
+    if (arrivalError) {
+      alert =
+        '<div class="gate-alert">' +
+          "<p>" + esc(T(arrivalError.key)) + "</p>" +
+          (arrivalError.detail
+            ? '<p class="gate-alert-detail">' + esc(T("err_detail")) + " " +
+              "<code>" + esc(arrivalError.detail) + "</code></p>"
+            : "") +
+        "</div>";
+      arrivalError = null;
+    }
+
     g.innerHTML =
       '<div class="gate" role="dialog" aria-modal="true">' +
         '<button class="gate-close" aria-label="Close">✕</button>' +
         '<h2>' + esc(T(keys[0])) + "</h2>" +
         '<p class="gate-lede">' + esc(body) + "</p>" +
+        alert +
         '<div class="gate-choices">' + buttons + "</div>" +
         '<div class="gate-step" id="gate-step"></div>' +
         // The terms are a link, not a word: promising "we don't sell data" in a
